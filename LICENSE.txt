@@ -1,0 +1,8 @@
+Licencia de los Proyectos de AREStudio
+
+Todos los proyectos de AREStudio mencionados y referenciados en esta aplicación están licenciados bajo los siguientes términos:
+
+Creative Commons Atribución-NoComercial 4.0 Internacional (CC BY-NC 4.0)
+URL: https://creativecommons.org/licenses/by-nc/4.0/
+
+Esto significa que puedes usar y modificar nuestras obras siempre que nos des crédito (Atribución) y no las uses con fines comerciales (No Comercial). Las versiones modificadas pueden ser distribuidas bajo los mismos términos de esta licencia.
