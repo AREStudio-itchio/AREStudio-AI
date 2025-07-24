@@ -1,3 +1,2 @@
 streamlit
 gradio_client
-requests
