@@ -46,12 +46,13 @@ def get_gemma_client():
 gemma_client = get_gemma_client()
 
 # --- FUNCIÓN PARA CONSULTAR LA IA (GEMMA-3) ---
-# Hemos eliminado el parámetro 'chat_history' porque este modelo no lo usa directamente.
 def consultar_gemma(user_prompt): 
+    # *** CAMBIO CRÍTICO AQUÍ: 'message' ahora es un diccionario como la API espera ***
+    gemma_input_message = {"text": user_prompt, "files": []}
+
     try:
-        # Pasa el user_prompt como string. Ya no se pasa 'history' como parámetro.
         resp = gemma_client.predict(
-            message=user_prompt, # El prompt del usuario actual
+            message=gemma_input_message, # Pasar el diccionario con 'text' y 'files'
             max_new_tokens=MAX_NEW_TOKENS,
             use_web_search=USE_WEB_SEARCH,
             use_korean=USE_KOREAN,
@@ -77,7 +78,7 @@ if "init_greeting_done" not in st.session_state:
         "¡Hola! Soy AREStudio AI. Estoy aquí para ayudarte con cualquier consulta sobre AREStudio o si tienes alguna pregunta general.",
         "¡Saludos! Soy AREStudio AI, tu asistente de AREStudio. ¿Cómo puedo asistirte hoy?"
     ])
-    st.session_state.messages.append({"role": "assistant", "content": saludo})
+    st.session_session.messages.append({"role": "assistant", "content": saludo})
 
 # Muestra todos los mensajes del historial en la interfaz de chat
 for message in st.session_state.messages:
@@ -117,7 +118,6 @@ if user_prompt:
                 st.markdown(response_text)
             st.session_state.messages.append({"role": "assistant", "content": response_text})
         else:
-            # Consulta a la IA. Ahora, sin el parámetro de historial en la llamada a consultar_gemma.
             respuesta_gemma = consultar_gemma(user_prompt) 
             with st.chat_message("assistant"):
                 st.markdown(respuesta_gemma)
