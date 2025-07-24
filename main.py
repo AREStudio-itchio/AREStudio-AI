@@ -1,63 +1,54 @@
 import streamlit as st
 from gradio_client import Client
-import requests
-from bs4 import BeautifulSoup
+import time
 
-# ===== MULTILINGÜE =====
-lang = st.sidebar.selectbox("🌐 Idioma / Language / Llengua", ["Español", "English", "Català"])
+# Inicializar idioma (solo interfaz)
+idioma = st.sidebar.selectbox("🌐 Idioma / Language / Llengua", ("Español", "Català", "English"))
 
-texts = {
-    "Español": {
-        "title": "AREStudio AI",
-        "subtitle": "Tu asistente inteligente multilingüe",
-        "input": "Escribe tu mensaje aquí:",
-        "send": "Enviar",
-        "output": "Respuesta de la IA:"
-    },
-    "English": {
-        "title": "AREStudio AI",
-        "subtitle": "Your multilingual smart assistant",
-        "input": "Type your message here:",
-        "send": "Send",
-        "output": "AI Response:"
-    },
-    "Català": {
-        "title": "AREStudio AI",
-        "subtitle": "El teu assistent intel·ligent multilingüe",
-        "input": "Escriu el teu missatge aquí:",
-        "send": "Envia",
-        "output": "Resposta de la IA:"
-    }
+# Traducciones de la interfaz
+título = {
+    "Español": "AREStudio AI - Asistente conversacional",
+    "Català": "AREStudio AI - Assistent conversacional",
+    "English": "AREStudio AI - Conversational Assistant"
 }
 
-# ===== TÍTULO Y SUBTÍTULO =====
-st.title(texts[lang]["title"])
-st.subheader(texts[lang]["subtitle"])
+subtítulo = {
+    "Español": "Hazme preguntas y hablaré contigo como un asistente inteligente.",
+    "Català": "Fes-me preguntes i parlaré amb tu com un assistent intel·ligent.",
+    "English": "Ask me anything and I’ll talk with you like a smart assistant."
+}
 
-# ===== SCRAPING LEGAL A AREStudio.itch.io =====
-def get_arestudio_projects():
-    url = "https://arestudio.itch.io"
-    response = requests.get(url)
-    soup = BeautifulSoup(response.text, "html.parser")
-    titles = [a.text for a in soup.find_all("div", class_="game_title")]
-    return titles
+# Mostrar UI
+st.title(título[idioma])
+st.caption(subtítulo[idioma])
 
-with st.expander("🎮 Proyectos públicos en AREStudio.itch.io"):
-    for title in get_arestudio_projects():
-        st.markdown(f"- {title}")
+# Cliente Gradio
+client = Client("VIDraft/Gemma-3-R1984-27B")
 
-# ===== GRADIO CLIENT CON GEMMA-3 SIN TOKEN =====
-try:
-    client = Client("VIDraft/Gemma-3-R1984-27B")
-    msg = st.text_input(texts[lang]["input"])
-    if st.button(texts[lang]["send"]) and msg:
-        with st.spinner("Pensando..."):
-            result = client.predict(
-                msg,
-                api_name="/chat"
-            )
-            st.success(texts[lang]["output"])
-            st.markdown(result)
-except Exception as e:
-    st.error("⚠️ Error al conectar con el modelo Gemma-3.")
-    st.code(str(e))
+# Inicializar historial en estado de sesión
+if "mensajes" not in st.session_state:
+    st.session_state.mensajes = []
+
+# Mostrar historial
+for msg in st.session_state.mensajes:
+    with st.chat_message(msg["rol"]):
+        st.markdown(msg["contenido"])
+
+# Entrada del usuario
+pregunta = st.chat_input("💬 Escribe aquí...")
+
+if pregunta:
+    st.session_state.mensajes.append({"rol": "user", "contenido": pregunta})
+    with st.chat_message("user"):
+        st.markdown(pregunta)
+
+    with st.chat_message("assistant"):
+        pensando = st.empty()
+        pensando.markdown("⏳ Pensando...")
+        try:
+            respuesta = client.predict(pregunta, api_name="/chat")
+        except Exception as e:
+            respuesta = "⚠️ Ocurrió un error al contactar con el modelo."
+
+        pensando.markdown(respuesta)
+    st.session_state.mensajes.append({"rol": "assistant", "contenido": respuesta})
