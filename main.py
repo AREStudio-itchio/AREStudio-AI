@@ -2,6 +2,23 @@ import streamlit as st
 from gradio_client import Client
 import traceback
 
+# Función para insertar código JS que hace scroll suave hacia el final del contenedor chat
+def scroll_to_bottom(smoothness=500):
+    # smoothness es la duración en ms del scroll, la puedes ajustar
+    scroll_script = f"""
+    <script>
+    const container = window.parent.document.querySelector('main section[data-testid="stMarkdownContainer"]');
+    if (container) {{
+        const distance = container.scrollHeight - container.scrollTop - container.clientHeight;
+        // Ajusta duración proporcional a la distancia
+        let duration = {smoothness} * (distance / container.scrollHeight);
+        if(duration < 100) duration = 100;  // mínimo 100ms
+        container.scrollTo({{top: container.scrollHeight, behavior: 'smooth'}});
+    }}
+    </script>
+    """
+    st.components.v1.html(scroll_script, height=0, width=0)
+
 st.set_page_config(page_title="AREStudio AI", layout="centered")
 
 client = Client("VIDraft/Gemma-3-R1984-27B")
@@ -54,7 +71,14 @@ if user_input:
         with st.chat_message("assistant"):
             st.markdown(respuesta)
 
+        # Scroll hacia abajo con suavidad proporcional
+        scroll_to_bottom(smoothness=700)
+
     except Exception:
         st.session_state.historial.append({"role": "assistant", "content": "⚠️ Error al contactar con AREStudio AI. Por favor, inténtalo de nuevo más tarde."})
         with st.chat_message("assistant"):
             st.markdown("⚠️ Error al contactar con AREStudio AI. Por favor, inténtalo de nuevo más tarde.")
+        scroll_to_bottom(smoothness=700)
+else:
+    # Para que al iniciar también baje al final (por si hay mensajes previos)
+    scroll_to_bottom(smoothness=1000)
