@@ -1,12 +1,2 @@
 streamlit
-speechrecognition
-sounddevice
-numpy
-scipy
-gtts
-playsound==1.2.2
-requests
-beautifulsoup4
-lxml
 gradio_client
-langdetect
