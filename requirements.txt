@@ -1,6 +1,6 @@
-streamlit>=1.34.0
+streamlit
+speechrecognition
+pyttsx3
 requests
 beautifulsoup4
-langdetect
 gradio_client
-Pillow
