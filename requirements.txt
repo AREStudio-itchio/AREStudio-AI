@@ -1,2 +1,4 @@
 streamlit
 gradio-client
+requests
+beautifulsoup4
