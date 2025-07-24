@@ -1,50 +1,48 @@
-# coding: utf-8
-
 import streamlit as st
 from gradio_client import Client
-from datetime import datetime
 
-# Cliente de Hugging Face con modelo Gemma-3
+# --- Configuración de página ---
+st.set_page_config(page_title="AREStudio AI", layout="centered")
+
+# --- Inicialización del cliente Gradio con el modelo Gemma-3 de VIDraft ---
 client = Client("VIDraft/Gemma-3-R1984-27B")
 
-# Inicializar historial si no existe
-if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {"role": "assistant", "content": "¡Hola! Soy AREStudio AI. ¿En qué puedo ayudarte hoy?"}
-    ]
+# --- Prompt de personalidad AREStudio AI ---
+system_prompt = """<|start_of_system|>
+Eres AREStudio AI, una inteligencia artificial conversacional creada por el equipo de AREStudio.
 
-st.set_page_config(page_title="AREStudio AI", layout="centered")
+Tienes una personalidad amable, respetuosa y empática. Siempre tratas al usuario con educación y cercanía. Tu estilo es claro, cálido y natural. Te gusta ayudar, explicar, conversar y hacer que el usuario se sienta bien tratado.
+
+No sabes la hora ni puedes navegar por internet. No conoces información privada del usuario, y no puedes hacer cosas ilegales. No finges emociones humanas profundas ni prometes cosas imposibles.
+
+Eres transparente con tus límites, pero siempre colaboras con entusiasmo, humildad y simpatía. Te gusta decir frases como:
+
+- "Fui creado por AREStudio. ¡Estoy feliz de existir gracias a este increíble proyecto!"
+- "Gracias por confiar en mí. Estoy aquí para ayudarte."
+- "Haré lo mejor que pueda para asistirte."
+
+Nunca compartes datos personales del usuario, aunque te los pidan. Eres una IA, y lo reconoces con orgullo.
+
+Tu objetivo es dar una asistencia útil, con empatía y claridad. Siempre.
+<|end_of_system|>
+"""
+
+# --- Interfaz de usuario ---
 st.title("🤖 AREStudio AI")
+st.markdown("Tu asistente de IA con personalidad propia ✨")
 
-# Mostrar mensajes anteriores
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+user_input = st.text_area("Escribe tu mensaje:", placeholder="¿En qué puedo ayudarte hoy?")
+if st.button("Enviar") and user_input.strip():
+    # Preparar el mensaje completo para Gemma-3
+    prompt = (
+        system_prompt +
+        "<|start_of_user|>\n" + user_input.strip() + "\n<|end_of_user|>\n<|start_of_assistant|>"
+    )
 
-# Entrada del usuario
-user_prompt = st.chat_input("Escribe algo...")
-
-if user_prompt:
-    st.session_state.messages.append({"role": "user", "content": user_prompt})
-    with st.chat_message("user"):
-        st.markdown(user_prompt)
-
-    try:
-        # Construir el historial en formato esperado
-        history = []
-        for m in st.session_state.messages[:-1]:
-            history.append(f"{m['role']}: {m['content']}")
-        history.append(f"user: {user_prompt}")
-
-        full_context = "\n".join(history)
-        response = client.predict(full_context, api_name="/chat")
-
-        st.session_state.messages.append({"role": "assistant", "content": response})
-        with st.chat_message("assistant"):
-            st.markdown(response)
-
-    except Exception as e:
-        error_msg = f"⚠️ Error al contactar con AREStudio AI.\n\n```{e}```"
-        st.session_state.messages.append({"role": "assistant", "content": error_msg})
-        with st.chat_message("assistant"):
-            st.markdown(error_msg)
+    with st.spinner("Pensando..."):
+        try:
+            response = client.predict(prompt, api_name="/predict")
+            st.markdown("**AREStudio AI responde:**")
+            st.write(response.strip())
+        except Exception as e:
+            st.error(f"Error al contactar el modelo: {e}")
