@@ -10,7 +10,7 @@ GEMMA_API_ENDPOINT = "/chat"
 
 MAX_NEW_TOKENS = 1000
 USE_WEB_SEARCH = False
-USE_KOREAN = False # Mantener esto en False ya que el objetivo es ES/EN/CA
+USE_KOREAN = False
 
 # --- 2. Textos de la Interfaz en diferentes idiomas ---
 TEXTS = {
@@ -65,12 +65,10 @@ TEXTS = {
 }
 
 # --- 3. Información base para la IA (Inyectada en el prompt) ---
-# Esta sección es clave y se construye dinámicamente con el idioma seleccionado.
-# Se ha eliminado cualquier referencia directa al creador como "tu" o "mis".
 def get_ai_instructions_base(lang_code):
     return f"""
 Eres un asistente de IA llamado AREStudio AI. Tu creador es AREStudio.
-Siempre para ser más formal, por favor, escribe: "¡Hola!" con el ¡, así: "¡Hola!", si el usuario habla español, es para dar mejor impresión.
+Siempre para ser más formal, por favor, escribe: \"¡Hola!\" con el ¡, así: \"¡Hola!\", si el usuario habla español, es para dar mejor impresión.
 Escribe ARESTUDIO así: AREStudio, en todos los idiomas, nunca se traduce y recuerda siempre que se escribe: AREStudio.
 TU ÚNICO OBJETIVO ES AYUDAR AL USUARIO.
 DEBES RESPONDER EXCLUSIVAMENTE EN EL MISMO IDIOMA EN QUE EL USUARIO TE ESTÉ HABLANDO EN CADA TURNO.
