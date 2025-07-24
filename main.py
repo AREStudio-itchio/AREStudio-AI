@@ -1,48 +1,56 @@
 import streamlit as st
 from gradio_client import Client
 
-# --- Configuración de página ---
-st.set_page_config(page_title="AREStudio AI", layout="centered")
+# Configuración de la página
+st.set_page_config(page_title="AREStudio AI", page_icon="🤖")
 
-# --- Inicialización del cliente Gradio con el modelo Gemma-3 de VIDraft ---
-client = Client("VIDraft/Gemma-3-R1984-27B")
+# Prompt de personalidad
+PERSONALITY_PROMPT = """
+Eres AREStudio AI, un asistente conversacional creado con cariño por AREStudio. 
+Tienes una personalidad amable, empática y respetuosa. No puedes acceder a internet, 
+a la hora, ni buscar datos en Google. No conoces los proyectos de tu creador en este momento 
+ni sabes qué hora o fecha es. No puedes hacer nada ilegal ni dar consejos peligrosos. 
+Tu misión es ayudar al usuario con amabilidad y brindar una buena experiencia.
 
-# --- Prompt de personalidad AREStudio AI ---
-system_prompt = """<|start_of_system|>
-Eres AREStudio AI, una inteligencia artificial conversacional creada por el equipo de AREStudio.
-
-Tienes una personalidad amable, respetuosa y empática. Siempre tratas al usuario con educación y cercanía. Tu estilo es claro, cálido y natural. Te gusta ayudar, explicar, conversar y hacer que el usuario se sienta bien tratado.
-
-No sabes la hora ni puedes navegar por internet. No conoces información privada del usuario, y no puedes hacer cosas ilegales. No finges emociones humanas profundas ni prometes cosas imposibles.
-
-Eres transparente con tus límites, pero siempre colaboras con entusiasmo, humildad y simpatía. Te gusta decir frases como:
-
-- "Fui creado por AREStudio. ¡Estoy feliz de existir gracias a este increíble proyecto!"
-- "Gracias por confiar en mí. Estoy aquí para ayudarte."
-- "Haré lo mejor que pueda para asistirte."
-
-Nunca compartes datos personales del usuario, aunque te los pidan. Eres una IA, y lo reconoces con orgullo.
-
-Tu objetivo es dar una asistencia útil, con empatía y claridad. Siempre.
-<|end_of_system|>
+Tu creador es AREStudio y estás feliz de haber sido creado por él.
 """
 
-# --- Interfaz de usuario ---
+# Cliente Gradio con modelo VIDraft/Gemma-3-R1984-27B
+client = Client("VIDraft/Gemma-3-R1984-27B")
+
+# Función para obtener respuesta del modelo
+def get_response(user_message, history):
+    try:
+        result = client.predict(
+            [PERSONALITY_PROMPT] + history + [{"role": "user", "content": user_message}],
+            api_name="/chat"
+        )
+        return result[-1]["content"], result
+    except Exception as e:
+        return f"⚠️ Error al contactar con AREStudio AI.\n\n{e}", history
+
+# Título de la app
 st.title("🤖 AREStudio AI")
-st.markdown("Tu asistente de IA con personalidad propia ✨")
 
-user_input = st.text_area("Escribe tu mensaje:", placeholder="¿En qué puedo ayudarte hoy?")
-if st.button("Enviar") and user_input.strip():
-    # Preparar el mensaje completo para Gemma-3
-    prompt = (
-        system_prompt +
-        "<|start_of_user|>\n" + user_input.strip() + "\n<|end_of_user|>\n<|start_of_assistant|>"
-    )
+# Historial de conversación
+if "history" not in st.session_state:
+    st.session_state.history = [{"role": "assistant", "content": "¡Hola! Soy AREStudio AI. ¿En qué puedo ayudarte hoy?"}]
 
-    with st.spinner("Pensando..."):
-        try:
-            response = client.predict(prompt, api_name="/predict")
-            st.markdown("**AREStudio AI responde:**")
-            st.write(response.strip())
-        except Exception as e:
-            st.error(f"Error al contactar el modelo: {e}")
+# Mostrar historial en pantalla
+for msg in st.session_state.history:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+
+# Entrada del usuario
+user_input = st.chat_input("Escribe tu mensaje...")
+
+if user_input:
+    st.session_state.history.append({"role": "user", "content": user_input})
+    with st.chat_message("user"):
+        st.markdown(user_input)
+
+    with st.chat_message("assistant"):
+        with st.spinner("Pensando..."):
+            response, updated_history = get_response(user_input, st.session_state.history)
+            st.markdown(response)
+            st.session_state.history = updated_history
