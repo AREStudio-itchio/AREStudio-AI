@@ -1,4 +1,12 @@
 streamlit
+speechrecognition
+sounddevice
+numpy
+scipy
+gtts
+playsound==1.2.2
 requests
 beautifulsoup4
-gradio-client
+lxml
+gradio_client
+langdetect
