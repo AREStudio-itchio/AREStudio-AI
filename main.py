@@ -1,52 +1,53 @@
 import streamlit as st
 from gradio_client import Client
 
-# Estilo de la UI
-st.set_page_config(page_title="AREStudio AI - Asistente Multilingüe")
-st.title("🌐 Idioma / Language / Llengua")
-idioma = st.selectbox("", ["es", "en", "ca"])
+st.set_page_config(page_title="AREStudio AI - Asistente Multilingüe", layout="centered")
 
-st.markdown("### AREStudio AI - Asistente Multilingüe")
-st.markdown("""
-🧠 Hola. Soy tu asistente de AREStudio. Puedes preguntarme sobre nuestros proyectos, IA, programación, y mucho más.
-""")
+# Inicializar sesión
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+if "client" not in st.session_state:
+    st.session_state.client = Client("https://openfreeai-gemma-3b-chat.hf.space/")
 
-# Instrucciones en cada idioma
-if idioma == "es":
-    saludo = "¡Hola! Soy AREStudio AI. Estoy aquí para ayudarte con cualquier consulta sobre AREStudio o si tienes alguna pregunta general."
-elif idioma == "en":
-    saludo = "Hi! I'm AREStudio AI. I'm here to help you with anything related to AREStudio or general questions."
-else:
-    saludo = "Hola! Sóc AREStudio AI. Sóc aquí per ajudar-te amb qualsevol dubte sobre AREStudio o preguntes generals."
+# UI: Idioma y título
+st.markdown("### 🌐 Idioma / Language / Llengua")
+st.text("es")  # Puedes conectar con un selector si quieres cambiar el idioma
+st.title("AREStudio AI - Asistente Multilingüe")
 
-st.info(saludo)
+# Prompt de bienvenida
+if len(st.session_state.chat_history) == 0:
+    st.session_state.chat_history.append({
+        "role": "assistant",
+        "text": "🧠 Hola. Soy tu asistente de AREStudio. Puedes preguntarme sobre nuestros proyectos, IA, programación, y mucho más."
+    })
 
-# Función para conectar con la API (modifica el espacio si cambias de modelo)
-def consultar_IA(pregunta):
-    client = Client("OpenFreeAI/Gemma-3-R1984-27B")
-    respuesta = client.predict(
-        pregunta,         # texto
-        api_name="/chat"  # usa el endpoint correcto de tu Space
-    )
-    return respuesta
-
-# Interfaz del chat
-if "historial" not in st.session_state:
-    st.session_state.historial = []
+# Mostrar historial del chat
+for msg in st.session_state.chat_history:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["text"])
 
 # Entrada del usuario
-user_input = st.text_input("¿Qué quieres preguntar?", key="input")
+prompt = st.chat_input("Escribe aquí tu pregunta...")
 
-if st.button("Enviar"):
-    if user_input:
-        st.session_state.historial.append(("Tú", user_input))
+# Si hay entrada, procesar
+if prompt:
+    st.session_state.chat_history.append({"role": "user", "text": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    with st.chat_message("assistant"):
         with st.spinner("Pensando..."):
-            respuesta = consultar_IA(user_input)
-        st.session_state.historial.append(("AREStudio AI", respuesta))
+            try:
+                response = st.session_state.client.predict(
+                    prompt, api_name="/chat"
+                )
+                st.session_state.chat_history.append({"role": "assistant", "text": response})
+                st.markdown(response)
+            except Exception as e:
+                st.session_state.chat_history.append({
+                    "role": "assistant",
+                    "text": "❌ Error al obtener respuesta de la IA."
+                })
+                st.error("Ocurrió un error.")
 
-# Mostrar conversación
-for rol, texto in st.session_state.historial:
-    if rol == "Tú":
-        st.markdown(f"**🧑‍💻 {rol}:** {texto}")
-    else:
-        st.markdown(f"**🤖 {rol}:** {texto}")
+# Fin del código
