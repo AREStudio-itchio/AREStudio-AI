@@ -6,17 +6,34 @@ st.set_page_config(page_title="AREStudio AI", layout="centered")
 
 client = Client("VIDraft/Gemma-3-R1984-27B")
 
-prompt_base = (
-    "AREStudio AI es un asistente amigable, útil y responsable. "
-    "Nunca genera contenido inapropiado ni ilegal y cambia de tema si se solicita eso. "
-    "Responde en el idioma que use el usuario."
-)
+prompt_base_template = """
+Eres AREStudio AI, un asistente amigable y responsable. Siempre respondes en el idioma en que el usuario escribe. No generas contenido inapropiado ni dañino y cambias de tema si te piden eso. Responde con alegría y educación.
+Usuario: {user_input}
+Asistente:
+"""
+
+def detectar_idioma(texto):
+    texto = texto.lower()
+    # Detecta idioma simple para ejemplo básico
+    if any(palabra in texto for palabra in ["hola", "qué", "cómo", "dónde", "por qué"]):
+        return "Español"
+    elif any(palabra in texto for palabra in ["hello", "how", "what", "where", "why"]):
+        return "English"
+    elif any(palabra in texto for palabra in ["hola", "com va", "què", "per què"]):
+        return "Català"
+    else:
+        return "Español"  # Por defecto español
 
 if "historial" not in st.session_state:
     st.session_state.historial = []
 
 st.title("🤖 AREStudio AI")
 st.markdown("Tu asistente conversacional responsable.")
+
+# Saludo inicial si no hay mensajes
+if len(st.session_state.historial) == 0:
+    saludo = "¡Hola! ¿En qué puedo ayudarte hoy?"
+    st.session_state.historial.append({"role": "assistant", "content": saludo})
 
 for msg in st.session_state.historial:
     role = msg["role"]
@@ -29,27 +46,25 @@ user_input = st.chat_input("Escribe tu mensaje...")
 if user_input:
     st.session_state.historial.append({"role": "user", "content": user_input})
 
-    prompt = f"{prompt_base}\n\nUsuario: {user_input}\n\nAsistente:"
+    idioma = detectar_idioma(user_input)
+    prompt = prompt_base_template.format(user_input=user_input)
 
     with st.chat_message("user"):
         st.markdown(user_input)
 
     try:
-        response = client.predict(
+        respuesta = client.predict(
             message={"text": prompt, "files": []},
             max_new_tokens=1000,
             use_web_search=False,
             use_korean=False,
             api_name="/chat"
         )
+        st.session_state.historial.append({"role": "assistant", "content": respuesta})
+        with st.chat_message("assistant"):
+            st.markdown(respuesta)
+
     except Exception as e:
-        # Aquí imprimes el error completo en la app para depurar
         error_text = traceback.format_exc()
         st.error(f"⚠️ Error al contactar con AREStudio AI:\n{error_text}")
-        response = "⚠️ Error al contactar con AREStudio AI. Mira el error arriba."
-
-    st.session_state.historial.append({"role": "assistant", "content": response})
-    with st.chat_message("assistant"):
-        st.markdown(response)
-
-    st.experimental_rerun()
+        st.session_state.historial.append({"role": "assistant", "content": "⚠️ Error al contactar con AREStudio AI."})
