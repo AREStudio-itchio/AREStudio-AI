@@ -11,7 +11,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("💬 AREStudio AI - WhatsApp Style")
+st.title("💬 AREStudio AI")
 
 # Gradio client config
 client = Client("VIDraft/Gemma-3-R1984-27B")
