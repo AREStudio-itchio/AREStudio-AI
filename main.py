@@ -2,119 +2,91 @@ import streamlit as st
 from gradio_client import Client
 from bs4 import BeautifulSoup
 import requests
-import random
-import re
 
-# Configuración página
-st.set_page_config(page_title="AREStudio AI", page_icon="🤖", layout="centered")
+# Interfaz traducible
+st.set_page_config(page_title="AREStudio AI", layout="centered")
 
-# Scraping legal proyectos AREStudio itch.io
+# Idiomas disponibles
+languages = {
+    "es": {
+        "title": "AREStudio AI",
+        "subtitle": "Asistente inteligente sobre mis proyectos",
+        "input_placeholder": "Escribe tu mensaje aquí...",
+        "button_label": "Enviar"
+    },
+    "en": {
+        "title": "AREStudio AI",
+        "subtitle": "Intelligent assistant about my projects",
+        "input_placeholder": "Type your message here...",
+        "button_label": "Send"
+    },
+    "ca": {
+        "title": "AREStudio AI",
+        "subtitle": "Assistent intel·ligent sobre els meus projectes",
+        "input_placeholder": "Escriu el teu missatge aquí...",
+        "button_label": "Envia"
+    }
+}
+
+# Selección de idioma
+lang = st.selectbox("Idioma / Language / Llengua", options=["es", "en", "ca"])
+labels = languages[lang]
+
+st.title(labels["title"])
+st.subheader(labels["subtitle"])
+
+# Conexión con Gradio Client
+client = Client("VIDraft/Gemma-3-R1984-27B-Chatbot")
+
+# Función de scraping legal
 @st.cache_data(ttl=3600)
-def get_arestudio_projects():
+def get_itchio_projects():
     url = "https://arestudio.itch.io"
-    headers = {"User-Agent": "AREStudioBot/1.0"}
-    try:
-        resp = requests.get(url, headers=headers, timeout=10)
-        resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "html.parser")
-        projs = []
-        for a in soup.select("a.title.game_link"):
-            title = a.text.strip()
-            link = a.get("href")
-            if title and link:
-                projs.append({"title": title, "url": link})
-        return projs
-    except Exception:
-        return []
+    headers = {"User-Agent": "Mozilla/5.0"}
+    response = requests.get(url, headers=headers)
+    soup = BeautifulSoup(response.text, "html.parser")
 
-# Inicializa cliente gradio
-@st.cache_resource
-def get_gemma_client():
-    return Client("VIDraft/Gemma-3-R1984-27B")
+    projects = []
+    for link in soup.find_all("a", class_="thumb_link"):
+        href = link.get("href")
+        title_tag = link.find("div", class_="game_title")
+        title = title_tag.text.strip() if title_tag else "Sin título"
+        if href:
+            projects.append({"title": title, "url": href})
 
-gemma_client = get_gemma_client()
+    return projects
 
-# Validación básica input
-def is_meaningful_input(text):
-    return len(text.strip()) >= 3 and bool(re.search(r'[a-zA-Z0-9]', text))
+# Mostrar proyectos si el usuario lo pide
+def detect_interest(text):
+    keywords = ["juegos", "proyectos", "games", "projects", "jocs"]
+    return any(kw.lower() in text.lower() for kw in keywords)
 
-# Inicializar chat
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-    saludo = random.choice([
-        "¡Hola! Soy AREStudio AI, encantado de ayudarte. ¿En qué puedo ayudarte hoy?",
-        "¡Hola! AREStudio AI a tu servicio. ¿Qué necesitas?",
-        "¡Saludos! Aquí AREStudio AI, listo para asistirte."
-    ])
-    st.session_state.messages.append({"role": "assistant", "content": saludo})
+# Chat
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
 
-# Mostrar mensajes previos
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+user_input = st.text_input(labels["input_placeholder"])
+if st.button(labels["button_label"]) and user_input.strip():
+    with st.spinner("Pensando..."):
+        response = client.predict(
+            user_input,
+            "Chat",
+            0.9,
+            0.95,
+            2048,
+            api_name="/chat"
+        )
 
-# Entrada usuario
-user_prompt = st.chat_input("Escribe tu pregunta aquí...")
+    st.session_state.chat_history.append(("👤", user_input))
+    st.session_state.chat_history.append(("🤖", response))
 
-if user_prompt:
-    st.session_state.messages.append({"role": "user", "content": user_prompt})
+# Mostrar historial
+for role, msg in st.session_state.chat_history:
+    st.markdown(f"**{role}**: {msg}")
 
-    with st.chat_message("user"):
-        st.markdown(user_prompt)
-
-    if not is_meaningful_input(user_prompt):
-        assistant_response = "Lo siento, no entendí bien eso. Por favor, pregunta con más detalle."
-        with st.chat_message("assistant"):
-            st.markdown(assistant_response)
-        st.session_state.messages.append({"role": "assistant", "content": assistant_response})
-
-    else:
-        lower_prompt = user_prompt.lower()
-
-        # Si pregunta sobre proyectos, dar respuesta con scraping
-        if any(k in lower_prompt for k in ["proyecto", "juego", "itch.io", "arestudio"]):
-            projs = get_arestudio_projects()
-            if projs:
-                lista_proyectos = "\n".join(
-                    [f"- [{p['title']}]({p['url']})" for p in projs[:5]]
-                )
-                response_text = (
-                    "AREStudio AI dice: Aquí algunos proyectos recientes:\n\n"
-                    + lista_proyectos
-                    + "\n\nPuedes ver más en https://arestudio.itch.io"
-                )
-            else:
-                response_text = "Lo siento, no pude obtener los proyectos ahora mismo."
-
-            with st.chat_message("assistant"):
-                st.markdown(response_text)
-            st.session_state.messages.append({"role": "assistant", "content": response_text})
-
-        else:
-            # Construir prompt para Gemma-3 con instrucciones y la pregunta
-            system_instructions = (
-                "Eres AREStudio AI, un asistente que siempre responde en el idioma del usuario, "
-                "sin revelar información personal, "
-                "sin decir cosas inapropiadas, "
-                "y siempre con respeto y censura. "
-                "Nunca digas que tu creador es AREStudio; solo di que eres AREStudio AI. "
-                "Tu usuario es amigable y curioso.\n"
-                "Pregunta del usuario:"
-            )
-            full_prompt = f"{system_instructions}\n{user_prompt}"
-
-            try:
-                resp = gemma_client.predict(
-                    message={"text": full_prompt, "files": []},
-                    max_new_tokens=1000,
-                    use_web_search=False,
-                    use_korean=False,
-                    api_name="/chat",
-                )
-                respuesta_gemma = resp if isinstance(resp, str) else resp[0]
-            except Exception as e:
-                respuesta_gemma = f"⚠️ Error al consultar la IA: {e}"
-
-            with st.chat_message("assistant"):
-                st.markdown(respuesta_gemma)
-            st.session_state.messages.append({"role": "assistant", "content": respuesta_gemma})
+# Si el usuario muestra interés, la IA responde con los proyectos
+if detect_interest(user_input):
+    st.markdown("---")
+    st.markdown("**🔍 Proyectos encontrados en [arestudio.itch.io](https://arestudio.itch.io):**")
+    for p in get_itchio_projects():
+        st.markdown(f"- [{p['title']}]({p['url']})")
