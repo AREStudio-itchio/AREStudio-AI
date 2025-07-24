@@ -1,30 +1,12 @@
 import streamlit as st
-from gradio_client import Client, handle_file
+from gradio_client import Client
 from bs4 import BeautifulSoup
 import requests
-from datetime import datetime
 import random
-import locale
 import re
 
 # Configuración página
 st.set_page_config(page_title="AREStudio AI", page_icon="🤖", layout="centered")
-
-# Configura locale para fecha en español
-try:
-    locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
-except:
-    try:
-        locale.setlocale(locale.LC_TIME, 'Spanish_Spain')
-    except:
-        pass
-
-# Función para obtener fecha y hora actual
-def obtener_fecha_hora():
-    ahora = datetime.now()
-    fecha = ahora.strftime("%A, %d de %B de %Y").capitalize()
-    hora = ahora.strftime("%H:%M:%S")
-    return fecha, hora
 
 # Scraping legal proyectos AREStudio itch.io
 @st.cache_data(ttl=3600)
@@ -42,7 +24,7 @@ def get_arestudio_projects():
             if title and link:
                 projs.append({"title": title, "url": link})
         return projs
-    except Exception as e:
+    except Exception:
         return []
 
 # Inicializa cliente gradio
@@ -59,12 +41,10 @@ def is_meaningful_input(text):
 # Inicializar chat
 if "messages" not in st.session_state:
     st.session_state.messages = []
-    # Saludo inicial con fecha y hora
-    fecha, hora = obtener_fecha_hora()
     saludo = random.choice([
-        f"¡Hola! Soy AREStudio AI, encantado de ayudarte. Hoy es {fecha} y son las {hora}. ¿En qué puedo ayudarte?",
-        f"¡Hola! AREStudio AI a tu servicio. Fecha actual: {fecha}, hora: {hora}. ¿Qué necesitas?",
-        f"¡Saludos! Aquí AREStudio AI, listo para asistirte. Hoy es {fecha} y son las {hora}."
+        "¡Hola! Soy AREStudio AI, encantado de ayudarte. ¿En qué puedo ayudarte hoy?",
+        "¡Hola! AREStudio AI a tu servicio. ¿Qué necesitas?",
+        "¡Saludos! Aquí AREStudio AI, listo para asistirte."
     ])
     st.session_state.messages.append({"role": "assistant", "content": saludo})
 
@@ -112,7 +92,6 @@ if user_prompt:
 
         else:
             # Construir prompt para Gemma-3 con instrucciones y la pregunta
-            fecha, hora = obtener_fecha_hora()
             system_instructions = (
                 "Eres AREStudio AI, un asistente que siempre responde en el idioma del usuario, "
                 "sin revelar información personal, "
@@ -120,7 +99,6 @@ if user_prompt:
                 "y siempre con respeto y censura. "
                 "Nunca digas que tu creador es AREStudio; solo di que eres AREStudio AI. "
                 "Tu usuario es amigable y curioso.\n"
-                f"Fecha y hora actual: {fecha} {hora}\n"
                 "Pregunta del usuario:"
             )
             full_prompt = f"{system_instructions}\n{user_prompt}"
