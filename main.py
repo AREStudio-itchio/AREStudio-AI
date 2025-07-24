@@ -1,54 +1,68 @@
 import streamlit as st
-from gradio_client import Client
-import time
+from gradio_client import Client, handle_file
 
-# Inicializar idioma (solo interfaz)
-idioma = st.sidebar.selectbox("🌐 Idioma / Language / Llengua", ("Español", "Català", "English"))
+# Selección de idioma para la UI
+lang = st.sidebar.selectbox("🌐 Idioma / Language / Llengua", ["Español", "Català", "English"])
 
-# Traducciones de la interfaz
-título = {
-    "Español": "AREStudio AI - Asistente conversacional",
-    "Català": "AREStudio AI - Assistent conversacional",
-    "English": "AREStudio AI - Conversational Assistant"
+texts = {
+    "Español": {
+        "title": "AREStudio AI",
+        "subtitle": "Tu asistente inteligente multilingüe",
+        "input": "Escribe tu mensaje aquí...",
+        "send": "Enviar",
+        "thinking": "Pensando...",
+    },
+    "Català": {
+        "title": "AREStudio AI",
+        "subtitle": "El teu assistent intel·ligent multilingüe",
+        "input": "Escriu el teu missatge aquí...",
+        "send": "Envia",
+        "thinking": "Pensa...",
+    },
+    "English": {
+        "title": "AREStudio AI",
+        "subtitle": "Your multilingual smart assistant",
+        "input": "Type your message here...",
+        "send": "Send",
+        "thinking": "Thinking...",
+    }
 }
 
-subtítulo = {
-    "Español": "Hazme preguntas y hablaré contigo como un asistente inteligente.",
-    "Català": "Fes-me preguntes i parlaré amb tu com un assistent intel·ligent.",
-    "English": "Ask me anything and I’ll talk with you like a smart assistant."
-}
+st.title(texts[lang]["title"])
+st.caption(texts[lang]["subtitle"])
 
-# Mostrar UI
-st.title(título[idioma])
-st.caption(subtítulo[idioma])
-
-# Cliente Gradio
+# Inicializamos cliente Gradio para Gemma-3
 client = Client("VIDraft/Gemma-3-R1984-27B")
 
-# Inicializar historial en estado de sesión
-if "mensajes" not in st.session_state:
-    st.session_state.mensajes = []
+if "history" not in st.session_state:
+    st.session_state.history = []
 
-# Mostrar historial
-for msg in st.session_state.mensajes:
-    with st.chat_message(msg["rol"]):
-        st.markdown(msg["contenido"])
+# Mostrar mensajes previos tipo chat
+for entry in st.session_state.history:
+    with st.chat_message(entry["role"]):
+        st.markdown(entry["content"])
 
-# Entrada del usuario
-pregunta = st.chat_input("💬 Escribe aquí...")
+# Entrada usuario
+user_input = st.chat_input(texts[lang]["input"])
 
-if pregunta:
-    st.session_state.mensajes.append({"rol": "user", "contenido": pregunta})
+if user_input:
+    # Agregamos mensaje usuario a historial
+    st.session_state.history.append({"role": "user", "content": user_input})
     with st.chat_message("user"):
-        st.markdown(pregunta)
-
+        st.markdown(user_input)
+    
     with st.chat_message("assistant"):
-        pensando = st.empty()
-        pensando.markdown("⏳ Pensando...")
+        placeholder = st.empty()
+        placeholder.markdown(f"⏳ {texts[lang]['thinking']}")
         try:
-            respuesta = client.predict(pregunta, api_name="/chat")
+            response = client.predict(
+                message={"text": user_input, "files": []},
+                max_new_tokens=1000,
+                use_web_search=False,
+                use_korean=False,
+                api_name="/chat"
+            )
         except Exception as e:
-            respuesta = "⚠️ Ocurrió un error al contactar con el modelo."
-
-        pensando.markdown(respuesta)
-    st.session_state.mensajes.append({"rol": "assistant", "contenido": respuesta})
+            response = f"⚠️ Error: {e}"
+        placeholder.markdown(response)
+        st.session_state.history.append({"role": "assistant", "content": response})
