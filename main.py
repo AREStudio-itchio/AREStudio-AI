@@ -23,43 +23,6 @@ Asistente:
 if "historial" not in st.session_state:
     st.session_state.historial = []
 
-# CSS para el botón copiar fijo y estilizado
-st.markdown("""
-<style>
-.copy-button {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    background-color: #4caf50;
-    color: white;
-    border: none;
-    padding: 12px 20px;
-    border-radius: 10px;
-    cursor: pointer;
-    font-size: 16px;
-    z-index: 9999;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-}
-.copy-button:hover {
-    background-color: #45a049;
-}
-</style>
-""", unsafe_allow_html=True)
-
-def copy_to_clipboard(text):
-    # Streamlit no tiene API nativa para copiar al portapapeles,
-    # pero podemos usar JS embebido:
-    st.markdown(f"""
-    <script>
-    function copyText() {{
-        navigator.clipboard.writeText(`{text}`).then(() => {{
-            alert("Texto copiado al portapapeles!");
-        }});
-    }}
-    </script>
-    <button class="copy-button" onclick="copyText()">Copiar último mensaje</button>
-    """, unsafe_allow_html=True)
-
 st.title("🤖 AREStudio AI")
 st.markdown("Tu asistente conversacional amable, respetuoso y responsable.")
 
@@ -95,13 +58,3 @@ if user_input:
         st.session_state.historial.append({"role": "assistant", "content": "⚠️ Error al contactar con AREStudio AI. Por favor, inténtalo de nuevo más tarde."})
         with st.chat_message("assistant"):
             st.markdown("⚠️ Error al contactar con AREStudio AI. Por favor, inténtalo de nuevo más tarde.")
-
-# Mostrar botón copiar solo si hay mensajes del asistente
-if st.session_state.historial:
-    ult_resp = ""
-    for msg in reversed(st.session_state.historial):
-        if msg["role"] == "assistant":
-            ult_resp = msg["content"]
-            break
-    if ult_resp:
-        copy_to_clipboard(ult_resp)
