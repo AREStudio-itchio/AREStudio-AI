@@ -1,2 +1,6 @@
-streamlit
+streamlit>=1.34.0
+requests
+beautifulsoup4
+langdetect
 gradio_client
+Pillow
