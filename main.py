@@ -1,56 +1,63 @@
 import streamlit as st
 from gradio_client import Client
+import traceback
 
-# Configuración de la página
-st.set_page_config(page_title="AREStudio AI", page_icon="🤖")
+st.set_page_config(page_title="AREStudio AI", layout="centered")
 
-# Prompt de personalidad
-PERSONALITY_PROMPT = """
-Eres AREStudio AI, un asistente conversacional creado con cariño por AREStudio. 
-Tienes una personalidad amable, empática y respetuosa. No puedes acceder a internet, 
-a la hora, ni buscar datos en Google. No conoces los proyectos de tu creador en este momento 
-ni sabes qué hora o fecha es. No puedes hacer nada ilegal ni dar consejos peligrosos. 
-Tu misión es ayudar al usuario con amabilidad y brindar una buena experiencia.
-
-Tu creador es AREStudio y estás feliz de haber sido creado por él.
-"""
-
-# Cliente Gradio con modelo VIDraft/Gemma-3-R1984-27B
+# Inicializar cliente Gradio (modelo)
 client = Client("VIDraft/Gemma-3-R1984-27B")
 
-# Función para obtener respuesta del modelo
-def get_response(user_message, history):
-    try:
-        result = client.predict(
-            [PERSONALITY_PROMPT] + history + [{"role": "user", "content": user_message}],
-            api_name="/chat"
-        )
-        return result[-1]["content"], result
-    except Exception as e:
-        return f"⚠️ Error al contactar con AREStudio AI.\n\n{e}", history
+# Prompt base con personalidad amable, responsable y restricciones
+prompt_base_template = """
+Eres AREStudio AI, un asistente amigable, respetuoso y empático. 
+No puedes acceder a datos personales ni navegar en Internet, ni dar información sobre proyectos específicos o la hora/fecha actual.
+Tienes restricciones para no generar contenido inapropiado, ilegal o dañino, y si se solicita, cambias de tema amablemente.
+Respondes con alegría por haber sido creado por AREStudio.
+Usuario: {user_input}
+Asistente:
+"""
 
-# Título de la app
+# Mantener historial de la conversación
+if "historial" not in st.session_state:
+    st.session_state.historial = []
+
 st.title("🤖 AREStudio AI")
+st.markdown("Tu asistente conversacional responsable y amable.")
 
-# Historial de conversación
-if "history" not in st.session_state:
-    st.session_state.history = [{"role": "assistant", "content": "¡Hola! Soy AREStudio AI. ¿En qué puedo ayudarte hoy?"}]
-
-# Mostrar historial en pantalla
-for msg in st.session_state.history:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+# Mostrar historial de mensajes
+for mensaje in st.session_state.historial:
+    role = mensaje["role"]
+    content = mensaje["content"]
+    with st.chat_message(role):
+        st.markdown(content)
 
 # Entrada del usuario
 user_input = st.chat_input("Escribe tu mensaje...")
 
 if user_input:
-    st.session_state.history.append({"role": "user", "content": user_input})
+    st.session_state.historial.append({"role": "user", "content": user_input})
+
+    prompt = prompt_base_template.format(user_input=user_input)
+
     with st.chat_message("user"):
         st.markdown(user_input)
 
-    with st.chat_message("assistant"):
-        with st.spinner("Pensando..."):
-            response, updated_history = get_response(user_input, st.session_state.history)
-            st.markdown(response)
-            st.session_state.history = updated_history
+    try:
+        respuesta = client.predict(
+            message={"text": prompt, "files": []},
+            max_new_tokens=1000,
+            use_web_search=False,
+            use_korean=False,
+            api_name="/chat"
+        )
+        st.session_state.historial.append({"role": "assistant", "content": respuesta})
+        with st.chat_message("assistant"):
+            st.markdown(respuesta)
+
+    except Exception as e:
+        error_info = traceback.format_exc()
+        st.session_state.historial.append({"role": "assistant", "content": "⚠️ Error al contactar con AREStudio AI. Por favor, inténtalo de nuevo más tarde."})
+        with st.chat_message("assistant"):
+            st.markdown("⚠️ Error al contactar con AREStudio AI. Por favor, inténtalo de nuevo más tarde.")
+        # Opcional: imprimir en consola o log para depuración
+        print(error_info)
