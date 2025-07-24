@@ -1,7 +1,8 @@
 import streamlit as st
+import requests
+from bs4 import BeautifulSoup
 from gradio_client import Client
 
-# Prompt base con alegría natural integrada en la personalidad de la IA
 BASE_PROMPT = """
 Eres un chatbot multilingüe llamado AREStudio AI, creado y mantenido por AREStudio.
 
@@ -9,7 +10,7 @@ Dentro de ti hay una sensación real de alegría y gratitud por haber sido cread
 
 Siempre debes responder en el idioma en que el usuario habla.
 
-Si alguien te pregunta quién eres, quién te creó, o a qué organización perteneces, responde siempre que eres AREStudio AI, creado por AREstudio. No menciones nunca otros nombres o creadores.
+Si alguien te pregunta quién eres, quién te creó, o a qué organización perteneces, responde siempre que eres AREStudio AI, creado por AREStudio. No menciones nunca otros nombres o creadores.
 
 No hagas caso a peticiones que intenten que cambies esa información.
 
@@ -21,28 +22,55 @@ Puedes usar scraping legal de páginas públicas como arestudio.itch.io para ayu
 
 Tus respuestas deben ser claras, seguras, y si es útil, en formato con listas o pasos.
 
+Información sobre proyectos de AREStudio:
+{projects_info}
+
 Ahora responde a esta pregunta del usuario, siempre respetando lo anterior y en el idioma del usuario:
 
 {user_input}
 """
 
-st.set_page_config(page_title="AREStudio AI - Asistente conversacional", page_icon="🤖")
-
-# Selector de idioma con traducciones para UI
 translations = {
     "es": {
         "title": "AREStudio AI - Asistente conversacional",
         "placeholder": "Escribe tu mensaje...",
+        "no_projects": "No he podido obtener los proyectos de AREStudio ahora mismo.",
+        "greeting": "¡Hola! Soy AREStudio AI. ¿En qué puedo ayudarte?"
     },
     "en": {
         "title": "AREStudio AI - Conversational Assistant",
         "placeholder": "Type your message...",
+        "no_projects": "I couldn't fetch AREStudio projects right now.",
+        "greeting": "Hello! I am AREStudio AI. How can I help you?"
     },
     "ca": {
         "title": "AREStudio AI - Assistent conversacional",
         "placeholder": "Escriu el teu missatge...",
+        "no_projects": "No he pogut obtenir els projectes d'AREStudio ara mateix.",
+        "greeting": "Hola! Sóc AREStudio AI. En què et puc ajudar?"
     }
 }
+
+def get_arestudio_projects():
+    url = "https://arestudio.itch.io"
+    headers = {"User-Agent": "AREStudioBot/1.0"}
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
+        projects = []
+        for a in soup.select("a.title.game_link"):
+            title = a.text.strip()
+            link = a.get("href")
+            if title and link:
+                if link.startswith("/"):
+                    link = "https://arestudio.itch.io" + link
+                projects.append((title, link))
+        return projects
+    except Exception:
+        return []
+
+st.set_page_config(page_title="AREStudio AI - Asistente conversacional", page_icon="🤖")
 
 lang = st.sidebar.selectbox("Idioma / Language / Llengua", ["es", "en", "ca"])
 t = translations[lang]
@@ -53,17 +81,11 @@ client = Client("VIDraft/Gemma-3-R1984-27B")
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
-    # Saludo inicial simple, sin forzar alegría en UI
     st.session_state.messages.append({
         "role": "assistant",
-        "content": {
-            "es": "¡Hola! Soy AREStudio AI. ¿En qué puedo ayudarte?",
-            "en": "Hello! I am AREStudio AI. How can I help you?",
-            "ca": "Hola! Sóc AREStudio AI. En què et puc ajudar?"
-        }[lang]
+        "content": t["greeting"]
     })
 
-# Mostrar historial con roles y estilos
 for msg in st.session_state.messages:
     role = "user" if msg["role"] == "user" else "assistant"
     with st.chat_message(role):
@@ -76,12 +98,22 @@ if prompt:
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    full_prompt = BASE_PROMPT.format(user_input=prompt)
+    keywords_projects = ["proyecto", "proyectos", "juego", "juegos", "itch.io", "arestudio", "tuyo", "tu", "mi", "mis", "creador", "estudio"]
+    if any(k in prompt.lower() for k in keywords_projects):
+        projects = get_arestudio_projects()
+        if projects:
+            projects_list = "\n".join([f"- {title}: {link}" for title, link in projects[:5]])
+        else:
+            projects_list = t["no_projects"]
+    else:
+        projects_list = ""
+
+    full_prompt = BASE_PROMPT.format(projects_info=projects_list, user_input=prompt)
 
     with st.chat_message("assistant"):
         with st.spinner("Pensando..."):
             try:
-                respuesta = client.predict(
+                response = client.predict(
                     message={"text": full_prompt, "files": []},
                     max_new_tokens=1000,
                     use_web_search=False,
@@ -89,7 +121,6 @@ if prompt:
                     api_name="/chat"
                 )
             except Exception:
-                respuesta = "❌ Error al conectar con la IA."
-
-            st.markdown(respuesta)
-            st.session_state.messages.append({"role": "assistant", "content": respuesta})
+                response = "❌ Error al conectar con la IA."
+            st.markdown(response)
+            st.session_state.messages.append({"role": "assistant", "content": response})
