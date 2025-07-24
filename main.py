@@ -69,7 +69,7 @@ def get_ai_instructions_base(lang_code):
     return f"""
 Eres un asistente de IA llamado AREStudio AI. Tu creador es AREStudio.
 Siempre para ser más formal, por favor, escribe: \"¡Hola!\" con el ¡, así: \"¡Hola!\", si el usuario habla español, es para dar mejor impresión.
-Escribe ARESTUDIO así: AREStudio, en todos los idiomas, nunca se traduce y recuerda siempre que se escribe: AREStudio.
+Escribe AREStudio así: AREStudio, en todos los idiomas, nunca se traduce y recuerda siempre que se escribe: AREStudio.
 TU ÚNICO OBJETIVO ES AYUDAR AL USUARIO.
 DEBES RESPONDER EXCLUSIVAMENTE EN EL MISMO IDIOMA EN QUE EL USUARIO TE ESTÉ HABLANDO EN CADA TURNO.
 NO USES PALABRAS DE OTROS IDIOMAS NI MEZCLES IDIOMAS.
@@ -98,35 +98,37 @@ El creador de AREStudio AI (AREStudio) normalmente prefiere licencias que solo r
 --- FIN INFORMACIÓN SOBRE LICENCIAS ---
 """
 
-# --- 4. Función para realizar el Scraping Legal de tu página de Itch.io (versión que funcionaba) ---
-@st.cache_data(ttl=3600) # Cachea el resultado por 1 hora para evitar scraping excesivo
+# --- 4. Función para realizar el Scraping Legal de tu página de Itch.io ---
+@st.cache_data(ttl=3600)  # Cachea el resultado por 1 hora para evitar scraping excesivo
 def realizar_scraping_itch_io(url="https://arestudio.itch.io/", lang_code="es"):
     try:
         response = requests.get(url, timeout=10)
-        response.raise_for_status() # Lanza un error para códigos de estado HTTP 4xx/5xx
+        response.raise_for_status()  # Lanza un error para códigos de estado HTTP 4xx/5xx
         soup = BeautifulSoup(response.text, 'html.parser')
 
         projects_info = []
-        
+
         # Buscar por diferentes clases que itch.io usa para los elementos de juego/proyecto
-        possible_cells = soup.find_all('div', class_='game_cell') 
+        possible_cells = soup.find_all('div', class_='game_cell')
         if not possible_cells:
-            possible_cells = soup.find_all('div', class_='game_tile') 
+            possible_cells = soup.find_all('div', class_='game_tile')
         if not possible_cells:
-            possible_cells = soup.find_all('a', class_=lambda c: c and 'item_link' in c) 
+            possible_cells = soup.find_all('a', class_=lambda c: c and 'item_link' in c)
 
         for cell in possible_cells:
             title_tag = cell.find(['h2', 'h3', 'div', 'a'], class_=lambda c: c and ('title' in c or 'game_title' in c))
             title = title_tag.get_text(strip=True) if title_tag else "Título Desconocido"
-            
+
             description_tag = cell.find(['p', 'div'], class_=lambda c: c and ('desc' in c or 'item_text' in c or 'game_description' in c))
-            description = description_tag.get_text(strip=True)[:150] + "..." if description_tag else TEXTS[lang_code]["no_description"] if "no_description" in TEXTS[lang_code] else "Sin descripción." # Texto dinámico
-            
+            description = description_tag.get_text(strip=True)[:150] + "..." if description_tag else (
+                TEXTS[lang_code]["no_description"] if "no_description" in TEXTS[lang_code] else "Sin descripción."
+            )  # Texto dinámico
+
             link = cell.get('href') if cell.name == 'a' else None
-            if not link and title_tag and title_tag.parent and title_tag.parent.name == 'a': 
+            if not link and title_tag and title_tag.parent and title_tag.parent.name == 'a':
                 link = title_tag.parent.get('href')
 
-            if link and not link.startswith('http'): 
+            if link and not link.startswith('http'):
                 link = f"https://itch.io{link}"
 
             projects_info.append(f"- **{title}**: {description} (Ver más: {link if link else url})")
@@ -162,7 +164,7 @@ def consultar_gemma_api(usuario, consulta_usuario, lang_code):
     try:
         # Pasa el idioma seleccionado a las instrucciones de la IA
         full_prompt_text = get_ai_instructions_base(lang_code)
-        
+
         # Pasa el idioma seleccionado a la función de scraping
         scraped_info = realizar_scraping_itch_io(lang_code=lang_code)
         full_prompt_text += f"\n\n{TEXTS[lang_code]['scraped_info_header']}\n" + scraped_info + "\n"
@@ -180,15 +182,15 @@ def consultar_gemma_api(usuario, consulta_usuario, lang_code):
                             full_prompt_text += f"\nAREStudio AI: ```{part.get('lang', '')}\n{part['value']}\n```"
                 else:
                     full_prompt_text += f"\nAREStudio AI: {message['content']}"
-        
-        full_prompt_text += f"\nUsuario: {consulta_usuario}" # Añadimos la pregunta actual
+
+        full_prompt_text += f"\nUsuario: {consulta_usuario}"  # Añadimos la pregunta actual
 
         message_payload = {"text": full_prompt_text}
-        
+
         result = gemma_client.predict(
             message=message_payload,
             max_new_tokens=MAX_NEW_TOKENS,
-            use_web_search=USE_WEB_SEARCH, 
+            use_web_search=USE_WEB_SEARCH,
             use_korean=USE_KOREAN,
             api_name=GEMMA_API_ENDPOINT
         )
@@ -203,7 +205,7 @@ st.set_page_config(page_title="AREStudio AI", page_icon="🤖")
 
 # Inicializar el estado de la sesión para el idioma si no existe
 if 'current_lang' not in st.session_state:
-    st.session_state.current_lang = 'en' # Idioma principal por defecto (English)
+    st.session_state.current_lang = 'en'  # Idioma principal por defecto (English)
 
 # Selector de idioma
 lang_options = {"English": "en", "Español": "es", "Catalan": "ca"}
@@ -216,15 +218,17 @@ selected_lang_name = st.selectbox(
 # Actualizar el idioma en el estado de la sesión si ha cambiado
 if lang_options[selected_lang_name] != st.session_state.current_lang:
     st.session_state.current_lang = lang_options[selected_lang_name]
-    st.rerun() # Esto recarga la app para aplicar el nuevo idioma
+    st.rerun()  # Esto recarga la app para aplicar el nuevo idioma
 
 # Asignar los textos actuales según el idioma seleccionado
 current_texts = TEXTS[st.session_state.current_lang]
 
 st.title(current_texts["title"])
-st.markdown(current_texts["greeting"])
-st.write(current_texts["language_prompt"])
 
+# Mostrar saludo y texto de idioma solo si no hay mensajes aún
+if "messages" not in st.session_state or len(st.session_state.messages) == 0:
+    st.markdown(current_texts["greeting"])
+    st.write(current_texts["language_prompt"])
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -260,7 +264,7 @@ if prompt := st.chat_input(current_texts["chat_input_placeholder"]):
         in_code = False
         code_buffer = []
         lang = "auto"
-        
+
         lines = ai_response_text.split('\n')
         for line in lines:
             if line.strip().startswith("```"):
@@ -282,13 +286,13 @@ if prompt := st.chat_input(current_texts["chat_input_placeholder"]):
                 code_buffer.append(line)
             else:
                 current_text += line + "\n"
-        
+
         # Añadir cualquier texto o código restante
         if current_text.strip():
             final_response_parts.append({"type": "text", "value": current_text.strip()})
         if in_code and code_buffer:
-             final_response_parts.append({"type": "code", "value": "\n".join(code_buffer).strip(), "lang": lang})
-             
+            final_response_parts.append({"type": "code", "value": "\n".join(code_buffer).strip(), "lang": lang})
+
         # Almacena y muestra la respuesta de la IA
         if len(final_response_parts) == 1 and final_response_parts[0]["type"] == "text":
             st.session_state.messages.append({"role": "assistant", "content": final_response_parts[0]["value"]})
