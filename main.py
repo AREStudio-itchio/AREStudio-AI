@@ -1,53 +1,67 @@
 import streamlit as st
 from gradio_client import Client
+import random
 
-st.set_page_config(page_title="AREStudio AI - Asistente Multilingüe", layout="centered")
+# 🌍 Traducciones
+translations = {
+    "es": {
+        "title": "AREStudio AI - Asistente conversacional",
+        "placeholder": "Escribe tu mensaje...",
+        "bot_greeting": [
+            "¡Hola! ¿En qué puedo ayudarte hoy?",
+            "¡Bienvenido! ¿Qué deseas saber?",
+            "Hola, soy tu IA de confianza. ¿Qué necesitas?"
+        ]
+    },
+    "en": {
+        "title": "AREStudio AI - Conversational Assistant",
+        "placeholder": "Type your message...",
+        "bot_greeting": [
+            "Hello! How can I assist you today?",
+            "Welcome! What would you like to know?",
+            "Hi, I'm your trusted AI. What do you need?"
+        ]
+    },
+    "ca": {
+        "title": "AREStudio AI - Assistent conversacional",
+        "placeholder": "Escriu el teu missatge...",
+        "bot_greeting": [
+            "Hola! En què et puc ajudar avui?",
+            "Benvingut! Què vols saber?",
+            "Hola, sóc la teva IA de confiança. Què necessites?"
+        ]
+    }
+}
 
-# Inicializar sesión
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
-if "client" not in st.session_state:
-    st.session_state.client = Client("https://openfreeai-gemma-3b-chat.hf.space/")
+# 🌐 Selector de idioma
+lang = st.sidebar.selectbox("Idioma / Language / Llengua", ["es", "en", "ca"])
+t = translations[lang]
 
-# UI: Idioma y título
-st.markdown("### 🌐 Idioma / Language / Llengua")
-st.text("es")  # Puedes conectar con un selector si quieres cambiar el idioma
-st.title("AREStudio AI - Asistente Multilingüe")
+st.set_page_config(page_title=t["title"], page_icon="🤖")
+st.title(t["title"])
 
-# Prompt de bienvenida
-if len(st.session_state.chat_history) == 0:
-    st.session_state.chat_history.append({
-        "role": "assistant",
-        "text": "🧠 Hola. Soy tu asistente de AREStudio. Puedes preguntarme sobre nuestros proyectos, IA, programación, y mucho más."
-    })
+# 🧠 Cliente Gradio
+client = Client("VIDraft/Gemma-3-R1984-27B")
 
-# Mostrar historial del chat
-for msg in st.session_state.chat_history:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["text"])
+# 📜 Historial de mensajes
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+    saludo = random.choice(t["bot_greeting"])
+    st.session_state.messages.append({"role": "assistant", "content": saludo})
 
-# Entrada del usuario
-prompt = st.chat_input("Escribe aquí tu pregunta...")
+# 💬 Mostrar historial
+for msg in st.session_state.messages:
+    with st.chat_message("user" if msg["role"] == "user" else "assistant"):
+        st.markdown(msg["content"])
 
-# Si hay entrada, procesar
+# 🧾 Entrada del usuario
+prompt = st.chat_input(t["placeholder"])
+
 if prompt:
-    st.session_state.chat_history.append({"role": "user", "text": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
+    # Mostrar mensaje del usuario
+    st.chat_message("user").markdown(prompt)
+    st.session_state.messages.append({"role": "user", "content": prompt})
 
-    with st.chat_message("assistant"):
-        with st.spinner("Pensando..."):
-            try:
-                response = st.session_state.client.predict(
-                    prompt, api_name="/chat"
-                )
-                st.session_state.chat_history.append({"role": "assistant", "text": response})
-                st.markdown(response)
-            except Exception as e:
-                st.session_state.chat_history.append({
-                    "role": "assistant",
-                    "text": "❌ Error al obtener respuesta de la IA."
-                })
-                st.error("Ocurrió un error.")
-
-# Fin del código
+    # 🔁 Llamar a la API de Gemma
+    with st.spinner("Pensando..."):
+        tr
