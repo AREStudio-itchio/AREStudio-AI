@@ -64,4 +64,17 @@ if prompt:
 
     # 🔁 Llamar a la API de Gemma
     with st.spinner("Pensando..."):
-        tr
+        try:
+            response = client.predict(
+                message={"text": prompt, "files": []},
+                max_new_tokens=1024,
+                use_web_search=False,
+                use_korean=False,
+                api_name="/chat"
+            )
+        except Exception as e:
+            response = "❌ Error al conectar con la IA."
+
+    # Mostrar respuesta del bot
+    st.chat_message("assistant").markdown(response)
+    st.session_state.messages.append({"role": "assistant", "content": response})
