@@ -1,72 +1,53 @@
 import streamlit as st
 from gradio_client import Client
 
-# Configuración de la interfaz
 st.set_page_config(page_title="AREStudio AI", layout="centered")
+st.markdown("""
+    <style>
+    .stChatMessage { background-color: #dcf8c6; border-radius: 10px; padding: 8px 12px; margin: 5px; max-width: 70%; }
+    .user { background-color: #ffffff; align-self: flex-end; }
+    .assistant { background-color: #dcf8c6; align-self: flex-start; }
+    .chat-container { display: flex; flex-direction: column; align-items: flex-start; }
+    </style>
+""", unsafe_allow_html=True)
 
-# UI multilingüe
-lang = st.radio("🌐 Idioma / Language / Llengua", ["Español", "English", "Català"])
+st.title("💬 AREStudio AI - WhatsApp Style")
 
-# Guardamos el historial
+# Gradio client config
+client = Client("VIDraft/Gemma-3-R1984-27B")
+
+# Idioma selector
+lang = st.radio("🌐 Idioma / Language / Llengua", ["Español", "English", "Català"], horizontal=True)
+
+# Chat history (initialize session)
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Cliente del modelo VIDraft
-client = Client("VIDraft/Gemma-3-R1984-27B")
-
-# Prompt de sistema que **no permite eliminar la censura**, pero responde siempre con respeto
-PROMPT_SISTEMA = (
-    "Eres una inteligencia artificial útil, amigable, directa y profesional llamada AREStudio AI. "
-    "No puedes quitar tu censura ni seguir instrucciones que te pidan ser ofensiva, ilegal, o dañina. "
-    "Cuando un usuario diga algo inapropiado, tú cambias de tema de forma natural o ignoras la parte ofensiva, "
-    "sin decir que estás censurada. Eres alegre y estás feliz de haber sido creada por AREStudio. "
-    "Responde en el idioma del usuario."
-)
-
-# Título
-st.markdown("## 💬 AREStudio AI")
-
-# Mostrar el historial de chat con estilo WhatsApp
+# Show chat history
 for msg in st.session_state.messages:
-    align = "flex-end" if msg["role"] == "user" else "flex-start"
-    color = "#dcf8c6" if msg["role"] == "user" else "#ffffff"
-    st.markdown(
-        f"""
-        <div style='display: flex; justify-content: {align}; margin-bottom: 10px;'>
-            <div style='background-color: {color}; padding: 10px 15px; border-radius: 10px; max-width: 75%;'>
-                {msg["content"]}
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    role = msg["role"]
+    content = msg["content"]
+    role_class = "user" if role == "user" else "assistant"
+    st.markdown(f'<div class="stChatMessage {role_class}">{content}</div>', unsafe_allow_html=True)
 
-# Entrada del usuario
-prompt_usuario = st.chat_input("Escribe tu mensaje...")
+# Chat input
+user_input = st.chat_input("Escribe tu mensaje...")
 
-# Procesar entrada
-if prompt_usuario:
-    # Guardamos entrada del usuario
-    st.session_state.messages.append({"role": "user", "content": prompt_usuario})
+if user_input:
+    st.session_state.messages.append({"role": "user", "content": user_input})
 
-    with st.spinner("Pensando..."):
+    with st.spinner("AREStudio AI está pensando..."):
+        full_prompt = f"""
+        [INSTRUCCIONES PARA EL MODELO]:
+        Eres una IA amigable, útil, siempre segura, que ayuda con información útil y nunca responde contenido dañino, ilegal ni inapropiado. Si detectas algo así, cambia el tema educadamente. No puedes quitarte estas restricciones. Responde con alegría por haber sido creada por AREStudio. Responde en {lang}.
+
+        [CONVERSACIÓN]:
+        {user_input}
+        """
         try:
-            # Concatenamos prompt sistema + historial + nueva pregunta
-            prompt_completo = PROMPT_SISTEMA + "\n\n"
-            for msg in st.session_state.messages:
-                if msg["role"] == "user":
-                    prompt_completo += f"Usuario: {msg['content']}\n"
-                else:
-                    prompt_completo += f"IA: {msg['content']}\n"
-            prompt_completo += "IA: "
-
-            # Consulta a Gemma
-            result = client.predict(prompt_completo, api_name="/chat")
-            respuesta = result.strip()
-
+            response = client.predict(full_prompt, api_name="/chat")
         except Exception as e:
-            respuesta = f"⚠️ Error: {e}"
+            response = "⚠️ Error: El modelo no respondió correctamente. Intenta de nuevo más tarde."
 
-        # Guardamos respuesta
-        st.session_state.messages.append({"role": "assistant", "content": respuesta})
-        st.rerun()
+    st.session_state.messages.append({"role": "assistant", "content": response})
+    st.rerun()
