@@ -1,67 +1,52 @@
 import streamlit as st
 from gradio_client import Client
 
-# Configuración de la página
-st.set_page_config(page_title="AREStudio AI - Asistente Multilingüe", layout="centered")
-st.markdown("<h1 style='text-align: center;'>🌐 Idioma / Language / Llengua</h1>", unsafe_allow_html=True)
-
-# Selector de idioma
+# Estilo de la UI
+st.set_page_config(page_title="AREStudio AI - Asistente Multilingüe")
+st.title("🌐 Idioma / Language / Llengua")
 idioma = st.selectbox("", ["es", "en", "ca"])
 
-# Textos multilingües
-textos = {
-    "es": {
-        "titulo": "AREStudio AI - Asistente Multilingüe",
-        "descripcion": "🧠 Hola. Soy tu asistente de AREStudio. Puedes preguntarme sobre nuestros proyectos, IA, programación, y mucho más.",
-        "input": "Escribe tu mensaje...",
-        "enviar": "Enviar",
-    },
-    "en": {
-        "titulo": "AREStudio AI - Multilingual Assistant",
-        "descripcion": "🧠 Hello. I’m your AREStudio assistant. You can ask me about our projects, AI, programming, and more.",
-        "input": "Type your message...",
-        "enviar": "Send",
-    },
-    "ca": {
-        "titulo": "AREStudio AI - Assistent Multilingüe",
-        "descripcion": "🧠 Hola. Sóc el teu assistent d’AREStudio. Pots preguntar-me sobre els nostres projectes, IA, programació, i molt més.",
-        "input": "Escriu el teu missatge...",
-        "enviar": "Envia",
-    }
-}
+st.markdown("### AREStudio AI - Asistente Multilingüe")
+st.markdown("""
+🧠 Hola. Soy tu asistente de AREStudio. Puedes preguntarme sobre nuestros proyectos, IA, programación, y mucho más.
+""")
 
-# Mostrar textos en el idioma seleccionado
-st.markdown(f"### {textos[idioma]['titulo']}")
-st.info(textos[idioma]["descripcion"])
+# Instrucciones en cada idioma
+if idioma == "es":
+    saludo = "¡Hola! Soy AREStudio AI. Estoy aquí para ayudarte con cualquier consulta sobre AREStudio o si tienes alguna pregunta general."
+elif idioma == "en":
+    saludo = "Hi! I'm AREStudio AI. I'm here to help you with anything related to AREStudio or general questions."
+else:
+    saludo = "Hola! Sóc AREStudio AI. Sóc aquí per ajudar-te amb qualsevol dubte sobre AREStudio o preguntes generals."
 
-# Inicializar sesión
-if "mensajes" not in st.session_state:
-    st.session_state.mensajes = [{"role": "ai", "content": "Hola! ¿Qué puedo hacer por ti hoy?"}]
+st.info(saludo)
 
-# Mostrar mensajes anteriores
-for mensaje in st.session_state.mensajes:
-    if mensaje["role"] == "user":
-        st.markdown(f"**Tú:** {mensaje['content']}")
-    else:
-        st.markdown(f"**AREStudio AI:** {mensaje['content']}")
+# Función para conectar con la API (modifica el espacio si cambias de modelo)
+def consultar_IA(pregunta):
+    client = Client("OpenFreeAI/Gemma-3-R1984-27B")
+    respuesta = client.predict(
+        pregunta,         # texto
+        api_name="/chat"  # usa el endpoint correcto de tu Space
+    )
+    return respuesta
+
+# Interfaz del chat
+if "historial" not in st.session_state:
+    st.session_state.historial = []
 
 # Entrada del usuario
-input_usuario = st.text_input(textos[idioma]["input"], key="input")
+user_input = st.text_input("¿Qué quieres preguntar?", key="input")
 
-if st.button(textos[idioma]["enviar"]) and input_usuario:
-    st.session_state.mensajes.append({"role": "user", "content": input_usuario})
+if st.button("Enviar"):
+    if user_input:
+        st.session_state.historial.append(("Tú", user_input))
+        with st.spinner("Pensando..."):
+            respuesta = consultar_IA(user_input)
+        st.session_state.historial.append(("AREStudio AI", respuesta))
 
-    try:
-        # Llamar a la API de Gradio (por ejemplo, Gemma-3)
-        client = Client("https://gemma-3-r1984-27b-chatbot.hf.space/")
-        respuesta = client.predict(
-            input_usuario,
-            api_name="/chat"
-        )
-        respuesta = respuesta.strip()
-
-    except Exception as e:
-        respuesta = "Lo siento, ha ocurrido un error al contactar con la IA."
-
-    st.session_state.mensajes.append({"role": "ai", "content": respuesta})
-    st.experimental_rerun()
+# Mostrar conversación
+for rol, texto in st.session_state.historial:
+    if rol == "Tú":
+        st.markdown(f"**🧑‍💻 {rol}:** {texto}")
+    else:
+        st.markdown(f"**🤖 {rol}:** {texto}")
