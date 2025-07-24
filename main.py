@@ -1,12 +1,19 @@
 import streamlit as st
 from gradio_client import Client
 
-# Configuración de la página
+# Configuración inicial de la página
 st.set_page_config(page_title="AREStudio AI", layout="centered")
-st.title("🤖 AREStudio AI")
-st.markdown("Tu asistente conversacional útil y responsable.")
+st.title("AREStudio AI")
+st.markdown("Asistente conversacional útil y responsable.")
 
-# Mensaje inicial del sistema (no se muestra al usuario)
+# Inicializar historial si no existe
+if "mensajes" not in st.session_state:
+    st.session_state.mensajes = []
+
+# Conectar al cliente de Gradio (sin mostrar detalles)
+client = Client("VIDraft/Gemma-3-R1984-27B")
+
+# Prompt del sistema que da contexto
 prompt_sistema = (
     "AREStudio AI es un asistente conversacional diseñado para ayudar al usuario con respuestas claras, educativas y útiles. "
     "Responde con responsabilidad, mantiene un tono respetuoso, y evita temas delicados si pueden ser sensibles. "
@@ -14,41 +21,33 @@ prompt_sistema = (
     "Siempre intenta ser útil y cordial, ayudando con programación, ideas creativas, tareas escolares, y más."
 )
 
-# Inicialización de sesión
-if "mensajes" not in st.session_state:
-    st.session_state.mensajes = []
-
-# Cliente de Gradio (NO se muestra el modelo al usuario)
-client = Client("VIDraft/Gemma-3-R1984-27B")
-
-# Mostrar el historial de mensajes
+# Mostrar historial de conversación
 for rol, mensaje in st.session_state.mensajes:
-    emoji = "🧑" if rol == "usuario" else "🤖"
-    with st.chat_message(rol):
-        st.markdown(f"{emoji} {mensaje}")
+    with st.chat_message(role=rol):
+        st.markdown(mensaje)
 
 # Entrada del usuario
-prompt_usuario = st.chat_input("Escribe tu mensaje...")
+entrada = st.chat_input("Escribe tu mensaje...")
 
-if prompt_usuario:
-    # Mostrar mensaje del usuario
-    st.session_state.mensajes.append(("usuario", prompt_usuario))
-    with st.chat_message("usuario"):
-        st.markdown(f"🧑 {prompt_usuario}")
+if entrada:
+    # Añadir mensaje del usuario
+    st.session_state.mensajes.append(("user", entrada))
+    with st.chat_message("user"):
+        st.markdown(entrada)
 
-    # Crear el mensaje combinado
-    mensaje_completo = f"{prompt_sistema}\n\nUsuario: {prompt_usuario}\n\nAsistente:"
+    # Combinar el contexto con la entrada del usuario
+    mensaje = f"{prompt_sistema}\n\nUsuario: {entrada}\n\nAsistente:"
 
-    # Obtener la respuesta del modelo
     try:
-        respuesta = client.predict(
-            mensaje_completo,
-            api_name="/chat"
-        )
-    except Exception as e:
-        respuesta = "⚠️ Error al contactar con AREStudio AI."
+        respuesta = client.predict(mensaje, api_name="/chat")
 
-    # Mostrar respuesta
-    st.session_state.mensajes.append(("asistente", respuesta))
-    with st.chat_message("assistant"):
-        st.markdown(f"🤖 {respuesta}")
+        # Añadir respuesta al historial
+        st.session_state.mensajes.append(("assistant", respuesta))
+        with st.chat_message("assistant"):
+            st.markdown(respuesta)
+
+    except Exception:
+        error_msg = "⚠️ Error al contactar con AREStudio AI."
+        st.session_state.mensajes.append(("assistant", error_msg))
+        with st.chat_message("assistant"):
+            st.markdown(error_msg)
