@@ -1,87 +1,96 @@
 import streamlit as st
+from gradio_client import Client
+import traceback
 import requests
 from bs4 import BeautifulSoup
-from gradio_client import Client
-
-# Cliente Gradio sin mostrar modelo al usuario
-client = Client("VIDraft/Gemma-3-R1984-27B")
 
 st.set_page_config(page_title="AREStudio AI", layout="centered")
-st.title("🤖 AREStudio AI")
-st.markdown("Tu asistente conversacional útil y responsable.")
 
-# Prompt base para la IA
-prompt_sistema = (
-    "AREStudio AI es un asistente conversacional diseñado para ayudar al usuario con respuestas claras, educativas y útiles. "
-    "Responde con responsabilidad, mantiene un tono respetuoso, y evita temas delicados si pueden ser sensibles. "
-    "No permite contenido ofensivo, peligroso o inapropiado. "
-    "Siempre intenta ser útil y cordial, ayudando con programación, ideas creativas, tareas escolares, y más."
-)
+client = Client("VIDraft/Gemma-3-R1984-27B")
 
-# Función para hacer scraping legal en arestudio.itch.io y obtener proyectos
-def obtener_proyectos():
-    url = "https://arestudio.itch.io/"
-    try:
-        response = requests.get(url, timeout=10)
-        if response.status_code != 200:
-            return []
-        soup = BeautifulSoup(response.text, "html.parser")
-        # Aquí el selector CSS o XPath para encontrar proyectos: ejemplo, buscar los links con clase "game_cell_link"
-        proyectos = []
-        for a in soup.select("a.game_cell_link"):
-            titulo = a.get("title") or a.text.strip()
-            enlace = a.get("href")
-            if enlace and not enlace.startswith("http"):
-                enlace = "https://arestudio.itch.io" + enlace
-            if titulo and enlace:
-                proyectos.append(f"[{titulo}]({enlace})")
-        return proyectos
-    except Exception:
-        return []
+prompt_base_template = """
+Eres AREStudio AI, un asistente amigable y responsable. Siempre respondes en el idioma en que el usuario escribe. No generas contenido inapropiado ni dañino y cambias de tema si te piden eso. Responde con alegría y educación.
+Usuario: {user_input}
+Asistente:
+"""
 
-# Mostrar mensajes previos
-if "mensajes" not in st.session_state:
-    st.session_state.mensajes = []
-
-for rol, mensaje in st.session_state.mensajes:
-    with st.chat_message("user" if rol == "usuario" else "assistant"):
-        st.markdown(mensaje)
-
-# Entrada usuario
-entrada = st.chat_input("Escribe tu mensaje...")
-
-if entrada:
-    st.session_state.mensajes.append(("usuario", entrada))
-    with st.chat_message("user"):
-        st.markdown(entrada)
-
-    # Aquí llamamos a la función scraping
-    proyectos = obtener_proyectos()
-
-    # Construir el prompt con info sobre proyectos solo si hay
-    if proyectos:
-        proyectos_str = "\n".join(f"- {p}" for p in proyectos)
-        prompt = (
-            f"{prompt_sistema}\n\n"
-            f"El usuario preguntó: {entrada}\n\n"
-            f"AREStudio tiene estos proyectos actualmente:\n{proyectos_str}\n\n"
-            "Responde en el idioma del usuario."
-        )
+def detectar_idioma(texto):
+    texto = texto.lower()
+    if any(palabra in texto for palabra in ["hola", "qué", "cómo", "dónde", "por qué"]):
+        return "Español"
+    elif any(palabra in texto for palabra in ["hello", "how", "what", "where", "why"]):
+        return "English"
+    elif any(palabra in texto for palabra in ["hola", "com va", "què", "per què"]):
+        return "Català"
     else:
-        prompt = (
-            f"{prompt_sistema}\n\n"
-            f"El usuario preguntó: {entrada}\n\n"
-            "Actualmente no hay proyectos disponibles en AREStudio. "
-            "Pero estamos trabajando en cosas emocionantes y esperamos tener nuevos proyectos pronto. "
-            "Por favor, mantente atento para futuras actualizaciones."
-            "\n\nResponde en el idioma del usuario."
-        )
+        return "Español"  # Por defecto español
 
+def scrape_proyectos():
     try:
-        respuesta = client.predict(prompt, api_name="/chat")
+        url = "https://arestudio.itch.io"
+        r = requests.get(url)
+        r.raise_for_status()
+        sopa = BeautifulSoup(r.text, "html.parser")
+        titulos = sopa.select("div.game_title")
+        proyectos = [t.get_text(strip=True) for t in titulos]
+        if proyectos:
+            return proyectos
+        else:
+            return ["Actualmente no hay proyectos disponibles."]
     except Exception as e:
-        respuesta = "⚠️ Error al contactar con AREStudio AI."
+        return [f"No se pudieron obtener los proyectos: {e}"]
 
-    st.session_state.mensajes.append(("asistente", respuesta))
-    with st.chat_message("assistant"):
-        st.markdown(respuesta)
+if "historial" not in st.session_state:
+    st.session_state.historial = []
+
+st.title("🤖 AREStudio AI")
+st.markdown("Tu asistente conversacional responsable.")
+
+# Saludo inicial si no hay mensajes
+if len(st.session_state.historial) == 0:
+    saludo = "¡Hola! ¿En qué puedo ayudarte hoy?"
+    st.session_state.historial.append({"role": "assistant", "content": saludo})
+
+for msg in st.session_state.historial:
+    role = msg["role"]
+    content = msg["content"]
+    with st.chat_message(role):
+        st.markdown(content)
+
+user_input = st.chat_input("Escribe tu mensaje...")
+
+if user_input:
+    st.session_state.historial.append({"role": "user", "content": user_input})
+
+    idioma = detectar_idioma(user_input)
+    
+    # Detectar si el usuario pregunta por proyectos
+    keywords_proyectos = ["proyecto", "proyectos", "juegos", "game", "games", "itch.io"]
+    if any(palabra in user_input.lower() for palabra in keywords_proyectos):
+        proyectos = scrape_proyectos()
+        respuesta = "Aquí tienes algunos proyectos disponibles en AREStudio:\n\n"
+        for p in proyectos:
+            respuesta += f"- {p}\n"
+        respuesta = respuesta.strip()
+        st.session_state.historial.append({"role": "assistant", "content": respuesta})
+        with st.chat_message("assistant"):
+            st.markdown(respuesta)
+    else:
+        prompt = prompt_base_template.format(user_input=user_input)
+        with st.chat_message("user"):
+            st.markdown(user_input)
+        try:
+            respuesta = client.predict(
+                message={"text": prompt, "files": []},
+                max_new_tokens=1000,
+                use_web_search=False,
+                use_korean=False,
+                api_name="/chat"
+            )
+            st.session_state.historial.append({"role": "assistant", "content": respuesta})
+            with st.chat_message("assistant"):
+                st.markdown(respuesta)
+        except Exception as e:
+            error_text = traceback.format_exc()
+            st.error(f"⚠️ Error al contactar con AREStudio AI:\n{error_text}")
+            st.session_state.historial.append({"role": "assistant", "content": "⚠️ Error al contactar con AREStudio AI."})
