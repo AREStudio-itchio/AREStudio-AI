@@ -20,21 +20,21 @@ st.markdown("Tu asistente conversacional amable, respetuoso y responsable.")
 if "historial" not in st.session_state:
     st.session_state.historial = []
 
-# Saludo inicial
+# Saludo inicial si no hay historial
 if len(st.session_state.historial) == 0:
-    st.session_state.historial.append({"role": "assistant", "content": "¡Hola! ¿En qué puedo ayudarte hoy?"})
+    saludo = "¡Hola! ¿En qué puedo ayudarte hoy?"
+    st.session_state.historial.append({"role": "assistant", "content": saludo})
 
 # Mostrar mensajes previos
-for mensaje in st.session_state.historial:
-    with st.chat_message(mensaje["role"]):
-        st.markdown(mensaje["content"])
+for msg in st.session_state.historial:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
 
 user_input = st.chat_input("Escribe tu mensaje...")
 
 if user_input:
     st.session_state.historial.append({"role": "user", "content": user_input})
 
-    # Construir prompt según idioma
     if es_ingles(user_input):
         prompt = f"""
 You are AREStudio AI, a kind, respectful, and responsible assistant. You always reply in the language used by the user.
@@ -74,7 +74,6 @@ Asistente:
         )
         st.session_state.historial.append({"role": "assistant", "content": respuesta})
 
-        # Mostrar respuesta
         with st.chat_message("assistant"):
             st.markdown(respuesta)
 
