@@ -2,15 +2,21 @@ import streamlit as st
 from gradio_client import Client
 import traceback
 
+# Configuración de la página
 st.set_page_config(
     page_title="AREStudio AI",
     page_icon="https://img.itch.zone/aW1nLzIyMjkyNTc3LnBuZw==/315x250%23c/CeYE7v.png",
     layout="centered"
 )
 
+# 🎯 TÍTULO Y SUBTÍTULO
+st.title("🤖 AREStudio AI")
+st.markdown("Tu asistente conversacional amable, respetuoso y responsable.")
+
+# Cliente del modelo Gradio
 client = Client("VIDraft/Gemma-3-R1984-27B")
 
-# Función para detectar inglés
+# Detectar si es inglés
 def es_ingles(texto):
     palabras_ingles = ["hello", "hi", "what", "how", "where", "why", "who", "can", "do", "you", "are"]
     return any(palabra in texto.lower() for palabra in palabras_ingles)
@@ -19,7 +25,7 @@ def es_ingles(texto):
 if "historial" not in st.session_state:
     st.session_state.historial = []
 
-# Mostrar historial
+# Mostrar historial del chat
 for msg in st.session_state.historial:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
@@ -31,7 +37,7 @@ if len(st.session_state.historial) == 0:
     with st.chat_message("assistant"):
         st.markdown(saludo)
 
-# Entrada de usuario
+# Entrada del usuario
 user_input = st.chat_input("Escribe tu mensaje...")
 
 if user_input:
@@ -39,7 +45,7 @@ if user_input:
     with st.chat_message("user"):
         st.markdown(user_input)
 
-    # Construcción del historial como texto
+    # Historial limitado para evitar tokens excesivos
     MAX_MENSAJES = 10
     historial_reciente = st.session_state.historial[-MAX_MENSAJES:]
 
@@ -50,7 +56,7 @@ if user_input:
         else:
             historial_str += f"Asistente: {mensaje['content']}\n"
 
-    # Elección de idioma base
+    # Determinar idioma
     if es_ingles(user_input):
         system_prompt = """
 You are AREStudio AI, a kind, respectful, and responsible assistant. You always reply in the same language the user uses.
@@ -65,7 +71,6 @@ Eres AREStudio AI, un asistente amable, respetuoso y responsable. Siempre respon
     final_prompt = system_prompt.strip() + "\n\n" + historial_str + "Asistente:"
 
     try:
-        # 🔥 Aquí usamos prompt directamente, no message
         respuesta = client.predict(
             prompt=final_prompt,
             max_new_tokens=1000,
@@ -77,5 +82,5 @@ Eres AREStudio AI, un asistente amable, respetuoso y responsable. Siempre respon
 
     except Exception as e:
         error_text = traceback.format_exc()
-        st.error(f"⚠️ Error al contactar con AREStudio AI:\n{error_text}")
+        st.error(f"⚠️ Error al contactar con AREStudio AI:\n\n```\n{error_text}\n```")
         st.session_state.historial.append({"role": "assistant", "content": "⚠️ Error al contactar con AREStudio AI."})
