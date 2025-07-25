@@ -17,6 +17,7 @@ def es_ingles(texto):
 st.title("🤖 AREStudio AI")
 st.markdown("Tu asistente conversacional amable, respetuoso y responsable.")
 
+# Inicializar historial en sesión si no existe
 if "historial" not in st.session_state:
     st.session_state.historial = []
 
@@ -28,14 +29,32 @@ for msg in st.session_state.historial:
 user_input = st.chat_input("Escribe tu mensaje...")
 
 if user_input:
-    # Mostrar el mensaje del usuario inmediatamente
+    # Guardar mensaje usuario en historial y mostrar inmediatamente
+    st.session_state.historial.append({"role": "user", "content": user_input})
     with st.chat_message("user"):
         st.markdown(user_input)
-    st.session_state.historial.append({"role": "user", "content": user_input})
 
-    # Construir el prompt completo según idioma
-    if es_ingles(user_input):
-        prompt = f"""
+    # Comando especial para mostrar primer mensaje
+    if user_input.lower() in ["cual fue mi primer mensaje", "cuál fue mi primer mensaje"]:
+        if st.session_state.historial:
+            # Buscar el primer mensaje del usuario en el historial
+            primer_mensaje = None
+            for m in st.session_state.historial:
+                if m["role"] == "user":
+                    primer_mensaje = m["content"]
+                    break
+            respuesta = f"Tu primer mensaje fue:\n\n> {primer_mensaje}"
+        else:
+            respuesta = "No tengo registrado ningún mensaje tuyo todavía."
+
+        with st.chat_message("assistant"):
+            st.markdown(respuesta)
+        st.session_state.historial.append({"role": "assistant", "content": respuesta})
+
+    else:
+        # Construir prompt completo según idioma
+        if es_ingles(user_input):
+            prompt = f"""
 You are AREStudio AI, a kind, respectful, and responsible assistant. You always reply in the language used by the user.
 ⚠️ IMPORTANT: You must ALWAYS reply in the SAME LANGUAGE the user uses. NEVER switch or mix languages. Respect this rule at all times.
 If you want to be helpful, you'll need to speak the user's language fluently and stay on topic and in the right language if the user doesn't want you to.
@@ -49,8 +68,8 @@ Avoid grammar and spelling mistakes.
 User: {user_input}
 Assistant:
 """
-    else:
-        prompt = f"""
+        else:
+            prompt = f"""
 Eres AREStudio AI, un asistente amable, respetuoso y responsable. Siempre respondes en el idioma en que el usuario escribe.
 ⚠️ IMPORTANTE: Debes responder SIEMPRE en el MISMO IDIOMA del usuario. NO cambies ni mezcles idiomas. Respeta esta regla siempre.
 Si quieres ser útil, tendrás que hablar el idioma del usuario con fluidez y no te desvíes del tema ni del idioma, si el usuario no quiere.
@@ -65,16 +84,16 @@ Usuario: {user_input}
 Asistente:
 """
 
-    with st.spinner("AREStudio AI está escribiendo..."):
-        try:
-            respuesta = client.predict(
-                message={"text": prompt, "files": []},
-                max_new_tokens=1000,
-                api_name="/chat"
-            )
-            with st.chat_message("assistant"):
-                st.markdown(respuesta)
-            st.session_state.historial.append({"role": "assistant", "content": respuesta})
-        except Exception:
-            error_text = traceback.format_exc()
-            st.error(f"⚠️ Error al contactar con AREStudio AI:\n\n```\n{error_text}\n```")
+        with st.spinner("AREStudio AI está escribiendo..."):
+            try:
+                respuesta = client.predict(
+                    message={"text": prompt, "files": []},
+                    max_new_tokens=1000,
+                    api_name="/chat"
+                )
+                with st.chat_message("assistant"):
+                    st.markdown(respuesta)
+                st.session_state.historial.append({"role": "assistant", "content": respuesta})
+            except Exception:
+                error_text = traceback.format_exc()
+                st.error(f"⚠️ Error al contactar con AREStudio AI:\n\n```\n{error_text}\n```")
