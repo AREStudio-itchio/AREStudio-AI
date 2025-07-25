@@ -1,2 +1,2 @@
 streamlit
-gradio-client
+gradio-client==3.36.1
