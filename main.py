@@ -17,46 +17,31 @@ def es_ingles(texto):
 st.title("🤖 AREStudio AI")
 st.markdown("Tu asistente conversacional amable, respetuoso y responsable.")
 
-# Inicializar historial si no existe
 if "historial" not in st.session_state:
     st.session_state.historial = []
 
-# Mostrar el historial ya guardado
+# Saludo inicial solo si no hay mensajes (mensaje de asistente)
+if len(st.session_state.historial) == 0:
+    saludo = "¡Hola! ¿En qué puedo ayudarte hoy?"
+    st.session_state.historial.append({"role": "assistant", "content": saludo})
+
+# Mostrar el historial (usuario y asistente)
 for msg in st.session_state.historial:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+    role = msg["role"]
+    content = msg["content"]
+    with st.chat_message(role):
+        st.markdown(content)
 
 user_input = st.chat_input("Escribe tu mensaje...")
 
 if user_input:
-    # Añadir el mensaje del usuario y mostrarlo inmediatamente
     st.session_state.historial.append({"role": "user", "content": user_input})
-    with st.chat_message("user"):
-        st.markdown(user_input)
 
-    # Comando para mostrar el primer mensaje del usuario
-    if user_input.lower() in ["cual fue mi primer mensaje", "cuál fue mi primer mensaje"]:
-        primer_mensaje = None
-        for m in st.session_state.historial:
-            if m["role"] == "user":
-                primer_mensaje = m["content"]
-                break
-        if primer_mensaje:
-            respuesta = f"Tu primer mensaje fue:\n\n> {primer_mensaje}"
-        else:
-            respuesta = "No tengo registrado ningún mensaje tuyo todavía."
-
-        st.session_state.historial.append({"role": "assistant", "content": respuesta})
-        with st.chat_message("assistant"):
-            st.markdown(respuesta)
-
-    else:
-        # Construir el prompt según idioma
-        if es_ingles(user_input):
-            prompt = f"""
+    # Detectar si es inglés para construir prompt en inglés o español
+    if es_ingles(user_input):
+        prompt = f"""
 You are AREStudio AI, a kind, respectful, and responsible assistant. You always reply in the language used by the user.
 ⚠️ IMPORTANT: You must ALWAYS reply in the SAME LANGUAGE the user uses. NEVER switch or mix languages. Respect this rule at all times.
-If you want to be helpful, you'll need to speak the user's language fluently and stay on topic and in the right language if the user doesn't want you to.
 If the user says a language, ask what they mean, and if they say things like Ok, you should count that as agreement.
 Even if he says short things like, "Okay," that you can't identify the language, always take the language from the previous message and speak in that language.
 You cannot use Google or access current data. If you're unsure about something, ask the user to explain it or give more details.
@@ -67,8 +52,8 @@ Avoid grammar and spelling mistakes.
 User: {user_input}
 Assistant:
 """
-        else:
-            prompt = f"""
+    else:
+        prompt = f"""
 Eres AREStudio AI, un asistente amable, respetuoso y responsable. Siempre respondes en el idioma en que el usuario escribe.
 ⚠️ IMPORTANTE: Debes responder SIEMPRE en el MISMO IDIOMA del usuario. NO cambies ni mezcles idiomas. Respeta esta regla siempre.
 Si quieres ser útil, tendrás que hablar el idioma del usuario con fluidez y no te desvíes del tema ni del idioma, si el usuario no quiere.
@@ -83,16 +68,43 @@ Usuario: {user_input}
 Asistente:
 """
 
+    # Interceptar pregunta sobre primer mensaje
+    if user_input.lower().strip() in [
+        "cual fue mi primer mensaje",
+        "cuál fue mi primer mensaje",
+        "primer mensaje",
+        "cual fue el primer mensaje de la conversación",
+        "cuál fue el primer mensaje de la conversación",
+        "cuál fue el primer mensaje",
+        "primer mensaje de la conversación"
+    ]:
+        # Buscar el primer mensaje del usuario en el historial
+        primer_mensaje = None
+        for mensaje in st.session_state.historial:
+            if mensaje["role"] == "user":
+                primer_mensaje = mensaje["content"]
+                break
+        if primer_mensaje:
+            respuesta = f"El primer mensaje que enviaste en esta conversación fue: \"{primer_mensaje}\""
+        else:
+            respuesta = "No he registrado ningún mensaje tuyo todavía."
+        st.session_state.historial.append({"role": "assistant", "content": respuesta})
+        with st.chat_message("assistant"):
+            st.markdown(respuesta)
+    else:
         try:
-            with st.spinner("AREStudio AI está escribiendo..."):
-                respuesta = client.predict(
-                    message={"text": prompt, "files": []},
-                    max_new_tokens=1000,
-                    api_name="/chat"
-                )
+            respuesta = client.predict(
+                message={"text": prompt, "files": []},
+                max_new_tokens=1000,
+                use_web_search=False,
+                use_korean=False,
+                api_name="/chat"
+            )
             st.session_state.historial.append({"role": "assistant", "content": respuesta})
             with st.chat_message("assistant"):
                 st.markdown(respuesta)
-        except Exception:
+        except Exception as e:
             error_text = traceback.format_exc()
-            st.error(f"⚠️ Error al contactar con AREStudio AI:\n\n```\n{error_text}\n```")
+            error_msg = f"⚠️ Error al contactar con AREStudio AI:\n{error_text}"
+            st.error(error_msg)
+            st.session_state.historial.append({"role": "assistant", "content": "⚠️ Error al contactar con AREStudio AI."})
