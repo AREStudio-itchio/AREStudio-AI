@@ -1,5 +1,12 @@
 import streamlit as st
 from gradio_client import Client
+import traceback
+
+st.set_page_config(
+    page_title="🤖 AREStudio AI",
+    page_icon="https://img.itch.zone/aW1nLzIyMjkyNTc3LnBuZw==/315x250%23c/CeYE7v.png",
+    layout="centered"
+)
 
 client = Client("VIDraft/Gemma-3-R1984-27B")
 
@@ -9,47 +16,50 @@ if "assistant_responses" not in st.session_state:
     st.session_state.assistant_responses = []
 
 def construir_prompt(user_msgs, assistant_msgs):
-    # Contexto base
     base_prompt = (
         "🤖 AREStudio AI\n\n"
         "Tu asistente conversacional amable, respetuoso y responsable.\n\n"
     )
-    # Añadimos historial de mensajes alternando roles
+    # Construir el diálogo completo alternando mensajes
     for u, a in zip(user_msgs, assistant_msgs):
         base_prompt += f"Usuario:\n{u}\n\n"
         base_prompt += f"Asistente:\n{a}\n\n"
-    # Si el usuario acaba de enviar un mensaje que no tiene respuesta aún
+    # Añadir mensaje de usuario pendiente respuesta
     if len(user_msgs) > len(assistant_msgs):
         base_prompt += f"Usuario:\n{user_msgs[-1]}\n\nAsistente:\n"
     return base_prompt
 
 st.title("🤖 AREStudio AI")
+st.markdown("Tu asistente conversacional amable, respetuoso y responsable.")
 
-# Mostrar conversación previa
+# Mostrar todo el historial estilo chat
 for u_msg, a_msg in zip(st.session_state.user_messages, st.session_state.assistant_responses):
-    st.markdown(f"**Usuario:** {u_msg}")
-    st.markdown(f"**Asistente:** {a_msg}")
+    with st.chat_message("user"):
+        st.markdown(u_msg)
+    with st.chat_message("assistant"):
+        st.markdown(a_msg)
 
-# Mostrar último mensaje de usuario pendiente de respuesta
+# Mostrar último mensaje del usuario pendiente respuesta
 if len(st.session_state.user_messages) > len(st.session_state.assistant_responses):
-    st.markdown(f"**Usuario:** {st.session_state.user_messages[-1]}")
+    with st.chat_message("user"):
+        st.markdown(st.session_state.user_messages[-1])
 
-user_input = st.text_input("Escribe tu mensaje...")
+user_input = st.chat_input("Escribe tu mensaje...")
 
 if user_input:
     st.session_state.user_messages.append(user_input)
-    prompt = construir_prompt(st.session_state.user_messages, st.session_state.assistant_responses)
-    try:
-        respuesta = client.predict(
-            prompt,
-            max_new_tokens=500,
-            api_name="/chat"
-        )
-        st.session_state.assistant_responses.append(respuesta.strip())
-    except Exception as e:
-        st.error(f"Error contactando con AREStudio AI: {e}")
-        st.session_state.assistant_responses.append("⚠️ Error al contactar con AREStudio AI.")
 
-    # Mostrar último intercambio
-    st.markdown(f"**Usuario:** {user_input}")
-    st.markdown(f"**Asistente:** {st.session_state.assistant_responses[-1]}")
+    prompt = construir_prompt(st.session_state.user_messages, st.session_state.assistant_responses)
+
+    with st.chat_message("assistant"):
+        try:
+            respuesta = client.predict(
+                prompt,
+                max_new_tokens=1000,
+                api_name="/chat"
+            )
+            st.session_state.assistant_responses.append(respuesta.strip())
+            st.markdown(respuesta.strip())
+        except Exception as e:
+            st.error("⚠️ Error al contactar con AREStudio AI.")
+            st.session_state.assistant_responses.append("⚠️ Error al contactar con AREStudio AI.")
