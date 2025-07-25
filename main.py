@@ -20,12 +20,12 @@ st.markdown("Tu asistente conversacional amable, respetuoso y responsable.")
 if "historial" not in st.session_state:
     st.session_state.historial = []
 
-# Saludo inicial si no hay historial
+# Mensaje inicial si no hay historial
 if len(st.session_state.historial) == 0:
     saludo = "¡Hola! ¿En qué puedo ayudarte hoy?"
     st.session_state.historial.append({"role": "assistant", "content": saludo})
 
-# Mostrar mensajes previos
+# Mostrar el historial completo
 for msg in st.session_state.historial:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
@@ -33,8 +33,10 @@ for msg in st.session_state.historial:
 user_input = st.chat_input("Escribe tu mensaje...")
 
 if user_input:
+    # Agregar el mensaje del usuario con rol 'user'
     st.session_state.historial.append({"role": "user", "content": user_input})
 
+    # Construir prompt según idioma
     if es_ingles(user_input):
         prompt = f"""
 You are AREStudio AI, a kind, respectful, and responsible assistant. You always reply in the language used by the user.
@@ -72,12 +74,14 @@ Asistente:
             max_new_tokens=1000,
             api_name="/chat"
         )
+        # Añadir respuesta con rol 'assistant'
         st.session_state.historial.append({"role": "assistant", "content": respuesta})
 
+        # Mostrar la respuesta recién recibida
         with st.chat_message("assistant"):
             st.markdown(respuesta)
 
     except Exception:
         error_text = traceback.format_exc()
         st.error(f"⚠️ Error al contactar con AREStudio AI:\n\n```\n{error_text}\n```")
-        st.session_state.historial.append({"role": "assistant", "content": "⚠️ Error al contactar con AREStudio AI."})
+        # No guardar error en historial para no repetirlo
