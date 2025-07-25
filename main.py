@@ -16,11 +16,9 @@ st.markdown("Tu asistente conversacional amable, respetuoso y responsable.")
 if "historial" not in st.session_state:
     st.session_state.historial = []
 
-# Saludo inicial
 if len(st.session_state.historial) == 0:
     st.session_state.historial.append({"role": "assistant", "content": "¡Hola! ¿En qué puedo ayudarte hoy?"})
 
-# Mostrar historial
 for mensaje in st.session_state.historial:
     with st.chat_message(mensaje["role"]):
         st.markdown(mensaje["content"])
@@ -31,10 +29,10 @@ if user_input:
     st.session_state.historial.append({"role": "user", "content": user_input})
 
     try:
-        # Enviar solo el texto del usuario directamente
         respuesta = client.predict(
-            user_input,
-            max_new_tokens=1000
+            message={"text": user_input, "files": []},
+            max_new_tokens=1000,
+            api_name="/chat"
         )
         st.session_state.historial.append({"role": "assistant", "content": respuesta})
 
