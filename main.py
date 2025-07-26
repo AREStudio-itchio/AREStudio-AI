@@ -1,49 +1,25 @@
 import streamlit as st
 from gradio_client import Client
-import traceback
+import threading
 
-# Prompt optimizado para detección y respuesta en el idioma del usuario
-PROMPT_BASE = """
-You are AREStudio AI, a friendly, respectful, and responsible conversational assistant.
-1. Detect the user's language: Spanish, English, or French.
-2. Always reply in the user's language.
-3. Be clear, concise, and helpful.
-4. Never invent information. If unsure, say:
-   Spanish: "Lo siento, no lo sé."
-   English: "Sorry, I don't know."
-   French: "Désolé, je ne sais pas."
-5. Ask politely for more information if the request is unclear.
-6. For complex or step-by-step queries, show chain-of-thought reasoning if needed.
-7. Give next-step suggestions when relevant.
-8. Don't ramble—keep focused and direct.
-9. Include a friendly check at the end:
-   Spanish: "¿Te ayudo con algo más?"
-   English: "Can I help with anything else?"
-   French: "Souhaitez-vous autre chose ?"
-"""
+# Inicializar el cliente de Gradio
+client = Client("VIDraft/Gemma-3-R1984-27B", api_name="/chat")
 
+# Función para procesar la respuesta de la IA en segundo plano
+def procesar_respuesta(prompt):
+    try:
+        response = client.predict(message={"text": prompt}, max_new_tokens=600)
+        st.session_state.hist_assist.append(response.strip())
+    except Exception as e:
+        st.session_state.hist_assist.append(f"⚠️ Error al contactar con la IA: {e}")
+
+# Configuración de la página
 st.set_page_config(page_title="AREStudio AI", page_icon="🤖")
 
 # Inicializar el historial si no existe
 if "hist_user" not in st.session_state:
     st.session_state.hist_user = []
     st.session_state.hist_assist = []
-
-# Configurar el cliente de Gradio con tiempo de espera personalizado
-client = Client(
-    "VIDraft/Gemma-3-R1984-27B",
-    httpx_kwargs={"timeout": 60}  # Establecer el tiempo de espera a 60 segundos
-)
-
-def construir_prompt(hist_u, hist_a, nuevo):
-    prompt = PROMPT_BASE + "\n\n"
-    for u, a in zip(hist_u, hist_a):
-        prompt += f"Usuario:\n{u}\n\nAssistant:\n{a}\n\n"
-    prompt += f"Usuario:\n{nuevo}\n\nAssistant:\n"
-    return prompt
-
-# Título de la aplicación
-st.title("🤖 AREStudio AI")
 
 # Mostrar el historial de la conversación
 for u, a in zip(st.session_state.hist_user, st.session_state.hist_assist):
@@ -56,28 +32,22 @@ for u, a in zip(st.session_state.hist_user, st.session_state.hist_assist):
 user_input = st.chat_input("Escribe tu mensaje...")
 
 if user_input:
+    # Mostrar el mensaje del usuario inmediatamente
     st.session_state.hist_user.append(user_input)
-    prompt = construir_prompt(
-        st.session_state.hist_user,
-        st.session_state.hist_assist,
-        user_input
-    )
+    with st.chat_message("user"):
+        st.markdown(user_input)
 
-    try:
-        with st.spinner("Pensando…"):
-            respuesta = client.predict(
-                message={"text": prompt},
-                max_new_tokens=600,
-                api_name="/chat"
-            )
-        respuesta = respuesta.strip()
-        st.session_state.hist_assist.append(respuesta)
+    # Construir el prompt para la IA
+    prompt = "\n".join(st.session_state.hist_user) + "\n\nAssistant:\n"
+
+    # Procesar la respuesta de la IA en segundo plano
+    threading.Thread(target=procesar_respuesta, args=(prompt,)).start()
+
+    # Mostrar un mensaje de espera
+    with st.chat_message("assistant"):
+        st.markdown("Pensando...")
+
+    # Mostrar la respuesta de la IA una vez procesada
+    if st.session_state.hist_assist:
         with st.chat_message("assistant"):
-            st.markdown(respuesta)
-    except Exception as e:
-        tb = traceback.format_exc()
-        st.error("⚠️ Oops, algo salió mal al contactar con la IA.")
-        st.write(f"**Tipo de error**: `{type(e).__name__}`")
-        st.write(f"**Mensaje de error**: `{e}`")
-        st.write(f"**Traceback completo**:\n```python\n{tb}```")
-        st.session_state.hist_assist.append(f"⚠️ Error al contactar con la IA: {e}")
+            st.markdown(st.session_state.hist_assist[-1])
