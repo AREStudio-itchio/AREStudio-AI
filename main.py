@@ -29,8 +29,11 @@ if "hist_user" not in st.session_state:
     st.session_state.hist_user = []
     st.session_state.hist_assist = []
 
-# Conectar con el cliente de Gradio
-client = Client("VIDraft/Gemma-3-R1984-27B")
+# Configurar el cliente de Gradio con tiempo de espera personalizado
+client = Client(
+    "VIDraft/Gemma-3-R1984-27B",
+    httpx_kwargs={"timeout": 60}  # Establecer el tiempo de espera a 60 segundos
+)
 
 def construir_prompt(hist_u, hist_a, nuevo):
     prompt = PROMPT_BASE + "\n\n"
@@ -63,10 +66,9 @@ if user_input:
     try:
         with st.spinner("Pensando…"):
             respuesta = client.predict(
-                prompt,
+                message={"text": prompt},
                 max_new_tokens=600,
-                api_name="/chat",
-                timeout=60
+                api_name="/chat"
             )
         respuesta = respuesta.strip()
         st.session_state.hist_assist.append(respuesta)
