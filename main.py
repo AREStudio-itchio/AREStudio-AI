@@ -77,5 +77,7 @@ if user_input:
     except Exception as e:
         tb = traceback.format_exc()
         st.error("⚠️ Oops, algo salió mal al contactar con la IA.")
-        st.write(f"`{type(e).__name__}: {e}`")
-        st.session_state.hist_assist.append("⚠️ Error al contactar con la IA.")
+        st.write(f"**Tipo de error**: `{type(e).__name__}`")
+        st.write(f"**Mensaje de error**: `{e}`")
+        st.write(f"**Traceback completo**:\n```python\n{tb}```")
+        st.session_state.hist_assist.append(f"⚠️ Error al contactar con la IA: {e}")
