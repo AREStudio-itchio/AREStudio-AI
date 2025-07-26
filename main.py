@@ -1,39 +1,62 @@
 import streamlit as st
-from gradio_client import Client, handle_file
+from gradio_client import Client
+import traceback
+import time
 
-# Inicializa el cliente de Gradio
-client = Client("VIDraft/Gemma-3-R1984-27B", api_name="/chat")
+# Prompt optimizado
+PROMPT_BASE = """
+You are AREStudio AI, a friendly, respectful, and responsible conversational assistant.
+...
+Close each answer with "¿Te ayudo con algo más?" / "Can I help with anything else?" etc.
+"""
 
-# Título de la aplicación
-st.title("Chat con Gemma-3")
+st.set_page_config(page_title="AREStudio AI", page_icon="🤖")
 
-# Inicializa el estado de la sesión si es la primera vez que se ejecuta
-if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "¡Hola! ¿En qué puedo ayudarte hoy?"}]
+if "hist_user" not in st.session_state:
+    st.session_state.hist_user = []
+    st.session_state.hist_assist = []
 
-# Muestra los mensajes anteriores
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+# Crear cliente Gradio
+client = Client(
+    "VIDraft/Gemma-3-R1984-27B",
+    hf_token=None  # Agrega token si es privado
+)
 
-# Entrada de texto del usuario
-if prompt := st.chat_input("Escribe tu mensaje aquí..."):
-    # Muestra el mensaje del usuario
-    st.chat_message("user").markdown(prompt)
+def construir_prompt(hist_u, hist_a, nuevo):
+    prompt = PROMPT_BASE + "\n\n"
+    for u, a in zip(hist_u, hist_a):
+        prompt += f"Usuario:\n{u}\n\nAssistant:\n{a}\n\n"
+    prompt += f"Usuario:\n{nuevo}\n\nAssistant:\n"
+    return prompt
 
-    # Añade el mensaje del usuario al historial
-    st.session_state.messages.append({"role": "user", "content": prompt})
+st.title("🤖 AREStudio AI")
 
-    # Prepara los datos para la predicción
-    inputs = {"text": prompt}
-    if uploaded_file := st.file_uploader("Sube una imagen (opcional):", type=["jpg", "png"]):
-        inputs["files"] = [handle_file(uploaded_file)]
+# Mostrar historial
+for u, a in zip(st.session_state.hist_user, st.session_state.hist_assist):
+    with st.chat_message("user"):
+        st.markdown(u)
+    with st.chat_message("assistant"):
+        st.markdown(a)
 
-    # Realiza la predicción
-    with st.spinner("Pensando..."):
-        try:
-            response = client.predict(inputs, max_new_tokens=1000, use_web_search=False, use_korean=False)
-            st.session_state.messages.append({"role": "assistant", "content": response})
-            st.chat_message("assistant").markdown(response)
-        except Exception as e:
-            st.error(f"Error al contactar con la IA: {e}")
+if prompt := st.chat_input("Escribe tu mensaje..."):
+    st.session_state.hist_user.append(prompt)
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    full_prompt = construir_prompt(st.session_state.hist_user, st.session_state.hist_assist, prompt)
+
+    with st.chat_message("assistant"):
+        message_placeholder = st.empty()
+        message_placeholder.markdown("*Pensando… (esperando respuesta de API)*")
+
+    try:
+        # opción sincrónica:
+        result = client.predict(message=full_prompt, api_name="/chat")
+        respuesta = result.strip()
+        st.session_state.hist_assist.append(respuesta)
+        message_placeholder.markdown(respuesta)
+    except Exception as e:
+        tb = traceback.format_exc()
+        err_msg = f"**Error:** `{type(e).__name__}`\n\n**Traceback completo:**\n```python\n{tb}```"
+        message_placeholder.markdown(err_msg)
+        st.session_state.hist_assist.append(err_msg)
