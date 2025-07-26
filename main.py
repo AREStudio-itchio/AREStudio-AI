@@ -2,118 +2,78 @@ import streamlit as st
 from gradio_client import Client
 import traceback
 
-# Configuración de página
-st.set_page_config(
-    page_title="AREStudio AI",
-    page_icon="https://img.itch.zone/aW1nLzIyMjkyNTc3LnBuZw==/315x250%23c/CeYE7v.png"
-)
+# Prompt optimizado para detección y respuesta en el idioma del usuario
+PROMPT_BASE = """
+You are AREStudio AI, a friendly, respectful, and responsible conversational assistant.
+1. Detect the user's language: Spanish, English, or French.
+2. Always reply in the user's language.
+3. Be clear, concise, and helpful.
+4. Never invent information. If unsure, say:
+   Spanish: "Lo siento, no lo sé."
+   English: "Sorry, I don't know."
+   French: "Désolé, je ne sais pas."
+5. Ask politely for more information if the request is unclear.
+6. For complex or step-by-step queries, show chain-of-thought reasoning if needed.
+7. Give next-step suggestions when relevant.
+8. Don't ramble—keep focused and direct.
+9. Include a friendly check at the end:
+   Spanish: "¿Te ayudo con algo más?"
+   English: "Can I help with anything else?"
+   French: "Souhaitez-vous autre chose ?"
+"""
 
-# Inicializar cliente Gradio
+st.set_page_config(page_title="AREStudio AI", page_icon="🤖")
+
+# Inicializar el historial si no existe
+if "hist_user" not in st.session_state:
+    st.session_state.hist_user = []
+    st.session_state.hist_assist = []
+
+# Conectar con el cliente de Gradio
 client = Client("VIDraft/Gemma-3-R1984-27B")
 
-# Estado inicial de la sesión
-if "user_messages" not in st.session_state:
-    st.session_state.user_messages = []
-if "assistant_responses" not in st.session_state:
-    st.session_state.assistant_responses = []
-if "last_language" not in st.session_state:
-    st.session_state.last_language = "en"
-
-# Función para detectar idioma
-def detectar_idioma(texto):
-    texto = texto.lower()
-    if any(palabra in texto for palabra in ["qué", "cómo", "gracias", "hola"]):
-        return "es"
-    elif any(palabra in texto for palabra in ["bonjour", "merci", "comment", "salut"]):
-        return "fr"
-    elif any(palabra in texto for palabra in ["hello", "thanks", "please", "what", "how"]):
-        return "en"
-    return "en"
-
-# Función para construir el prompt completo
-def construir_prompt(usuario, asistente, idioma):
-    instrucciones = {
-        "es": (
-            "Actúa como un asistente AI llamado AREStudio AI. "
-            "Eres respetuoso, claro, amable, y útil. No inventes información. "
-            "Responde siempre en español."
-        ),
-        "en": (
-            "Act as an AI assistant named AREStudio AI. "
-            "You are respectful, clear, kind, and helpful. Do not make up information. "
-            "Always reply in English."
-        ),
-        "fr": (
-            "Agis comme un assistant IA nommé AREStudio AI. "
-            "Tu es respectueux, clair, aimable et utile. Ne pas inventer d'informations. "
-            "Réponds toujours en français."
-        )
-    }
-
-    prompt = f"{instrucciones[idioma]}\n\n"
-    for u, a in zip(usuario, asistente):
-        prompt += f"Usuario:\n{u}\n\nAsistente:\n{a}\n\n"
-
-    # Si hay un mensaje pendiente sin respuesta
-    if len(usuario) > len(asistente):
-        prompt += f"Usuario:\n{usuario[-1]}\n\nAsistente:\n"
-
+def construir_prompt(hist_u, hist_a, nuevo):
+    prompt = PROMPT_BASE + "\n\n"
+    for u, a in zip(hist_u, hist_a):
+        prompt += f"Usuario:\n{u}\n\nAssistant:\n{a}\n\n"
+    prompt += f"Usuario:\n{nuevo}\n\nAssistant:\n"
     return prompt
 
-# UI
+# Título de la aplicación
 st.title("🤖 AREStudio AI")
-st.markdown(
-    "Tu asistente creado por [AREStudio](https://arestudio.itch.io) — amable, respetuoso, responsable y ahora con favicon 🎨"
-)
 
-# Mostrar historial
-for user_msg, assistant_msg in zip(st.session_state.user_messages, st.session_state.assistant_responses):
+# Mostrar el historial de la conversación
+for u, a in zip(st.session_state.hist_user, st.session_state.hist_assist):
     with st.chat_message("user"):
-        st.markdown(user_msg)
+        st.markdown(u)
     with st.chat_message("assistant"):
-        st.markdown(assistant_msg)
+        st.markdown(a)
 
-# Si el último mensaje no tiene respuesta aún
-if len(st.session_state.user_messages) > len(st.session_state.assistant_responses):
-    with st.chat_message("user"):
-        st.markdown(st.session_state.user_messages[-1])
-
-# Entrada de usuario
+# Entrada del usuario
 user_input = st.chat_input("Escribe tu mensaje...")
 
 if user_input:
-    st.session_state.user_messages.append(user_input)
-    idioma = detectar_idioma(user_input)
-    st.session_state.last_language = idioma
-
-    # Construcción del prompt
+    st.session_state.hist_user.append(user_input)
     prompt = construir_prompt(
-        st.session_state.user_messages,
-        st.session_state.assistant_responses,
-        idioma
+        st.session_state.hist_user,
+        st.session_state.hist_assist,
+        user_input
     )
 
     try:
-        # Predicción del modelo
-        respuesta = client.predict(
-            prompt,
-            max_new_tokens=1000,
-            api_name="/chat"
-        )
-
-        respuesta_limpia = respuesta.strip()
-        st.session_state.assistant_responses.append(respuesta_limpia)
+        with st.spinner("Pensando…"):
+            respuesta = client.predict(
+                prompt,
+                max_new_tokens=600,
+                api_name="/chat",
+                timeout=60
+            )
+        respuesta = respuesta.strip()
+        st.session_state.hist_assist.append(respuesta)
         with st.chat_message("assistant"):
-            st.markdown(respuesta_limpia)
-
+            st.markdown(respuesta)
     except Exception as e:
         tb = traceback.format_exc()
-        error_msg = (
-            f"⚠️ **Error al contactar con AREStudio AI:**\n\n"
-            f"**Tipo:** `{type(e).__name__}`\n"
-            f"**Mensaje:** `{e}`\n\n"
-            f"**Traceback:**\n```python\n{tb}```"
-        )
-        st.session_state.assistant_responses.append(error_msg)
-        with st.chat_message("assistant"):
-            st.error(error_msg)
+        st.error("⚠️ Oops, algo salió mal al contactar con la IA.")
+        st.write(f"`{type(e).__name__}: {e}`")
+        st.session_state.hist_assist.append("⚠️ Error al contactar con la IA.")
